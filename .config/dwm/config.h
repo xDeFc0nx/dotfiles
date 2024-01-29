@@ -78,13 +78,14 @@ static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont,
 static const char *termcmd[]  = { "alacritty", NULL };
 static const char *browsercmd[] = { "brave", NULL	};
 static const char *discord[] = { "discord", NULL};
-
+static const char *flameshot[] = {"flameshot", "gui", NULL};
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
 	{ MODKEY,                       XK_Return, spawn,          {.v = termcmd } },
 	{ MODKEY|ShiftMask,             XK_Return, spawn,          {.v = dmenucmd } },
-	{ MODKEY,                       XK_space,      togglebar,      {0} },
-	{ MODKEY,			XK_b,	   spawn,	   {.v = browsercmd}	},
+  { MODKEY|ShiftMask,             XK_s,      spawn,          {.v = flameshot}},
+	{ MODKEY,                       XK_space,  togglebar,      {0} },
+	{ MODKEY,                 			XK_b, 	   spawn,     	   {.v = browsercmd}	},
 	{ MODKEY,                       XK_j,      focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_k,      focusstack,     {.i = -1 } },
 	{ MODKEY,                       XK_i,      incnmaster,     {.i = +1 } },

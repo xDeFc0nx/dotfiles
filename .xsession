@@ -17,6 +17,8 @@ randomWallpaper &
 picom &
 slstatus &
 dunst &
+flameshot &
+
 #welcome &
 
 # Start your wm!
