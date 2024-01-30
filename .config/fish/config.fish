@@ -198,7 +198,7 @@ alias vpn='sudo openvpn --config pc.ovpn'
 alias doas="doas --"
 alias edit-fish='vim ~/.config/fish/config.fish'
 alias play='aplay -q'
-alias config='/usr/bin/git --git-dir=$HOME/dotfiles --work-tree=$HOME'
+alias config='/usr/bin/git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
 
 # navigation
 alias ..='cd ..'
