@@ -1,7 +1,7 @@
 [Desktop Entry]
 Encoding=UTF-8
-Name=dwm
+Name=pdwm
 Comment=Dynamic window manager
-Exec=dwm
+Exec=pdwm
 Icon=dwm
 Type=XSession
