@@ -22,4 +22,4 @@ flameshot &
 #welcome &
 
 # Start your wm!
-exec dwm
+exec pdwm
