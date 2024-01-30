@@ -1,0 +1,13 @@
+const unsigned int borderpx  = 3;
+const unsigned int snap      = 25;
+const unsigned int gappih    = 20;
+const unsigned int gappiv    = 10;
+const unsigned int gappoh    = 15;
+const unsigned int gappov    = 8;
+const int swallowfloating    = 0;
+const int smartgaps          = 0;
+const int showbar            = 1;
+const int topbar             = 1;
+const int showsystray        = 1;
+const int user_bh            = 30;
+static const char *fonts[]          = { "JetBrains Mono:style=Regular:size=13", "Symbols Nerd Font:style=2048-em:size=13","JoyPixels:size=10:antialias=true:autohint=true"};

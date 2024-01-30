@@ -1,0 +1,4 @@
+static struct Rule rules[] = {
+{ NULL,       "pavucontrol", NULL,             0,            1,           0,         1,         1,         1,         -1 },
+{ NULL,       NULL,           "nmtui",         0,            1,           1,         1,         0,         0,         -1 },
+};

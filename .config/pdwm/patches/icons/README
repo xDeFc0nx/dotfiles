@@ -1,0 +1,5 @@
+Putted icons must start from 0. 0.png, 1.png ... until 9.png.
+All icons must be set in /usr/local/share/phyos/dwm/icons/ dir.
+Icon 0 -> left status bar icon
+Icon 1 -> Settings
+Icon 2..9 -> Statusbar
