@@ -14,7 +14,7 @@ setxkbmap us
 xrandr --output Virtual-1 --mode 1920x1080 &
 xset led 3 &
 randomWallpaper &
-picom &
+picom --animations -b &
 slstatus &
 dunst &
 flameshot &
