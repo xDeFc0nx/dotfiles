@@ -44,8 +44,8 @@ const extern Config config[];
 const extern int lenconfig;
 
 typedef struct {
-	const char *name;
-	const void *cmd;
+  const char *name;
+  const void *cmd;
 } Sp;
 
 const extern char *spcmd1[];
@@ -59,7 +59,8 @@ const extern char *tags[10];
 const extern float mfact;
 const extern int nmaster;
 const extern int resizehints;
-#define FORCE_VSPLIT 1 /* nrowgrid layout: force two clients to always split vertically */
+#define FORCE_VSPLIT                                                           \
+  1 /* nrowgrid layout: force two clients to always split vertically */
 const extern Layout layouts[10];
 
 /* commands */
@@ -70,7 +71,8 @@ const extern char *layoutmenu_cmd;
 const extern char *termcmd[];
 
 /* button definitions */
-/* click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin */
+/* click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
+ * ClkClientWin, or ClkRootWin */
 const extern int lenbuttons;
 const extern int lenkeys;
 const extern int lenrules;
