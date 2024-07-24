@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) Yuxuan Shui <yshuiv7@gmail.com>
 #pragma once
-#include <GL/gl.h>
-#include <GL/glext.h>
+#include <epoxy/gl.h>
 #include <stdbool.h>
 #include <string.h>
 
 #include "backend/backend.h"
+#include "backend/backend_common.h"
 #include "log.h"
 #include "region.h"
 
@@ -29,8 +29,6 @@ static inline GLint glGetUniformLocationChecked(GLuint p, const char *name) {
 
 // Program and uniforms for window shader
 typedef struct {
-	UT_hash_handle hh;
-	uint32_t id;
 	GLuint prog;
 	GLint uniform_opacity;
 	GLint uniform_invert_color;
@@ -78,7 +76,7 @@ typedef struct {
 	GLint color_loc;
 } gl_fill_shader_t;
 
-/// @brief Wrapper of a binded GL texture.
+/// @brief Wrapper of a bound GL texture.
 struct gl_texture {
 	int refcount;
 	bool has_alpha;
@@ -112,6 +110,7 @@ struct gl_data {
 	GLuint frame_timing[2];
 	int current_frame_timing;
 	GLuint present_prog;
+	GLuint dummy_prog;
 
 	bool dithered_present;
 
@@ -145,13 +144,13 @@ void *gl_create_window_shader(backend_t *backend_data, const char *source);
 void gl_destroy_window_shader(backend_t *backend_data, void *shader);
 uint64_t gl_get_shader_attributes(backend_t *backend_data, void *shader);
 bool gl_set_image_property(backend_t *backend_data, enum image_properties prop,
-                           void *image_data, void *args);
+                           image_handle image, void *args);
 bool gl_last_render_time(backend_t *backend_data, struct timespec *time);
 
 /**
  * @brief Render a region with texture data.
  */
-void gl_compose(backend_t *, void *image_data, coord_t image_dst, void *mask,
+void gl_compose(backend_t *, image_handle image_data, coord_t image_dst, image_handle mask_,
                 coord_t mask_dst, const region_t *reg_tgt, const region_t *reg_visible, bool lerp);
 
 void gl_resize(struct gl_data *, int width, int height);
@@ -161,32 +160,32 @@ void gl_deinit(struct gl_data *gd);
 
 GLuint gl_new_texture(GLenum target);
 
-bool gl_image_op(backend_t *base, enum image_operations op, void *image_data,
+bool gl_image_op(backend_t *base, enum image_operations op, image_handle image,
                  const region_t *reg_op, const region_t *reg_visible, void *arg);
 
-void gl_release_image(backend_t *base, void *image_data);
-void *gl_make_mask(backend_t *base, geometry_t size, const region_t *reg);
+void gl_release_image(backend_t *base, image_handle image);
+image_handle gl_make_mask(backend_t *base, geometry_t size, const region_t *reg);
 
-void *gl_clone(backend_t *base, const void *image_data, const region_t *reg_visible);
+image_handle gl_clone(backend_t *base, image_handle image, const region_t *reg_visible);
 
-bool gl_blur(backend_t *base, double opacity, void *ctx, void *mask, coord_t mask_dst,
-             const region_t *reg_blur, const region_t *reg_visible);
-bool gl_blur_impl(double opacity, struct gl_blur_context *bctx, void *mask, coord_t mask_dst,
-                  const region_t *reg_blur, const region_t *reg_visible attr_unused,
-                  GLuint source_texture, geometry_t source_size, GLuint target_fbo,
-                  GLuint default_mask, bool high_precision);
+bool gl_blur(backend_t *base, double opacity, void *ctx, image_handle mask,
+             coord_t mask_dst, const region_t *reg_blur, const region_t *reg_visible);
+bool gl_blur_impl(double opacity, struct gl_blur_context *bctx,
+                  struct backend_image *mask, coord_t mask_dst, const region_t *reg_blur,
+                  const region_t *reg_visible attr_unused, GLuint source_texture,
+                  geometry_t source_size, GLuint target_fbo, GLuint default_mask,
+                  bool high_precision);
 void *gl_create_blur_context(backend_t *base, enum blur_method, void *args);
 void gl_destroy_blur_context(backend_t *base, void *ctx);
 struct backend_shadow_context *gl_create_shadow_context(backend_t *base, double radius);
 void gl_destroy_shadow_context(backend_t *base attr_unused, struct backend_shadow_context *ctx);
-void *gl_shadow_from_mask(backend_t *base, void *mask,
-                          struct backend_shadow_context *sctx, struct color color);
+image_handle gl_shadow_from_mask(backend_t *base, image_handle mask,
+                                 struct backend_shadow_context *sctx, struct color color);
 void gl_get_blur_size(void *blur_context, int *width, int *height);
 
 void gl_fill(backend_t *base, struct color, const region_t *clip);
 
 void gl_present(backend_t *base, const region_t *);
-bool gl_read_pixel(backend_t *base, void *image_data, int x, int y, struct color *output);
 enum device_status gl_device_status(backend_t *base);
 
 /**
@@ -264,26 +263,6 @@ static inline bool gl_check_fb_complete_(const char *func, int line, GLenum fb) 
 }
 
 #define gl_check_fb_complete(fb) gl_check_fb_complete_(__func__, __LINE__, (fb))
-
-/**
- * Check if a GL extension exists.
- */
-static inline bool gl_has_extension(const char *ext) {
-	int nexts = 0;
-	glGetIntegerv(GL_NUM_EXTENSIONS, &nexts);
-	for (int i = 0; i < nexts || !nexts; i++) {
-		const char *exti = (const char *)glGetStringi(GL_EXTENSIONS, (GLuint)i);
-		if (exti == NULL) {
-			break;
-		}
-		if (strcmp(ext, exti) == 0) {
-			return true;
-		}
-	}
-	gl_clear_err();
-	log_info("Missing GL extension %s.", ext);
-	return false;
-}
 
 static const GLuint vert_coord_loc = 0;
 static const GLuint vert_in_texcoord_loc = 1;

@@ -16,6 +16,7 @@
 #include <xcb/render.h>
 #include <xcb/sync.h>
 #include <xcb/xcb.h>
+#include <xcb/xcb_aux.h>
 #include <xcb/xcb_renderutil.h>
 #include <xcb/xfixes.h>
 
@@ -94,7 +95,7 @@ void x_connection_init(struct x_connection *c, Display *dpy) {
 	c->previous_xerror_handler = XSetErrorHandler(xerror);
 
 	c->screen = DefaultScreen(dpy);
-	c->screen_info = x_screen_of_display(c, c->screen);
+	c->screen_info = xcb_aux_get_screen(c->c, c->screen);
 }
 
 /**
@@ -181,10 +182,9 @@ xcb_window_t wid_get_prop_window(struct x_connection *c, xcb_window_t wid, xcb_a
 /**
  * Get the value of a text property of a window.
  */
-bool wid_get_text_prop(session_t *ps, xcb_window_t wid, xcb_atom_t prop, char ***pstrlst,
-                       int *pnstr) {
-	assert(ps->server_grabbed);
-	auto prop_info = x_get_prop_info(&ps->c, wid, prop);
+bool wid_get_text_prop(struct x_connection *c, struct atom *atoms, xcb_window_t wid,
+                       xcb_atom_t prop, char ***pstrlst, int *pnstr) {
+	auto prop_info = x_get_prop_info(c, wid, prop);
 	auto type = prop_info.type;
 	auto format = prop_info.format;
 	auto length = prop_info.length;
@@ -193,8 +193,7 @@ bool wid_get_text_prop(session_t *ps, xcb_window_t wid, xcb_atom_t prop, char **
 		return false;
 	}
 
-	if (type != XCB_ATOM_STRING && type != ps->atoms->aUTF8_STRING &&
-	    type != ps->atoms->aC_STRING) {
+	if (type != XCB_ATOM_STRING && type != atoms->aUTF8_STRING && type != atoms->aC_STRING) {
 		log_warn("Text property %d of window %#010x has unsupported type: %d",
 		         prop, wid, type);
 		return false;
@@ -209,7 +208,7 @@ bool wid_get_text_prop(session_t *ps, xcb_window_t wid, xcb_atom_t prop, char **
 	xcb_generic_error_t *e = NULL;
 	auto word_count = (length + 4 - 1) / 4;
 	auto r = xcb_get_property_reply(
-	    ps->c.c, xcb_get_property(ps->c.c, 0, wid, prop, type, 0, word_count), &e);
+	    c->c, xcb_get_property(c->c, 0, wid, prop, type, 0, word_count), &e);
 	if (!r) {
 		log_debug_x_error(e, "Failed to get window property for %#010x", wid);
 		free(e);
@@ -321,6 +320,17 @@ xcb_visualid_t x_get_visual_for_standard(struct x_connection *c, xcb_pict_standa
 	return x_get_visual_for_pictfmt(g_pictfmts, pictfmt->id);
 }
 
+xcb_visualid_t x_get_visual_for_depth(xcb_screen_t *screen, uint8_t depth) {
+	xcb_depth_iterator_t depth_it = xcb_screen_allowed_depths_iterator(screen);
+	for (; depth_it.rem; xcb_depth_next(&depth_it)) {
+		if (depth_it.data->depth == depth) {
+			return xcb_depth_visuals_iterator(depth_it.data).data->visual_id;
+		}
+	}
+
+	return XCB_NONE;
+}
+
 xcb_render_pictformat_t
 x_get_pictfmt_for_standard(struct x_connection *c, xcb_pict_standard_t std) {
 	x_get_server_pictfmts(c);
@@ -328,24 +338,6 @@ x_get_pictfmt_for_standard(struct x_connection *c, xcb_pict_standard_t std) {
 	auto pictfmt = xcb_render_util_find_standard_format(g_pictfmts, std);
 
 	return pictfmt->id;
-}
-
-int x_get_visual_depth(struct x_connection *c, xcb_visualid_t visual) {
-	auto setup = xcb_get_setup(c->c);
-	for (auto screen = xcb_setup_roots_iterator(setup); screen.rem;
-	     xcb_screen_next(&screen)) {
-		for (auto depth = xcb_screen_allowed_depths_iterator(screen.data);
-		     depth.rem; xcb_depth_next(&depth)) {
-			const int len = xcb_depth_visuals_length(depth.data);
-			const xcb_visualtype_t *visuals = xcb_depth_visuals(depth.data);
-			for (int i = 0; i < len; i++) {
-				if (visual == visuals[i].visual_id) {
-					return depth.data->depth;
-				}
-			}
-		}
-	}
-	return -1;
 }
 
 xcb_render_picture_t
@@ -459,6 +451,34 @@ bool x_fetch_region(struct x_connection *c, xcb_xfixes_region_t r, pixman_region
 	return ret;
 }
 
+bool x_set_region(struct x_connection *c, xcb_xfixes_region_t dst, const region_t *src) {
+	if (!src || dst == XCB_NONE) {
+		return false;
+	}
+
+	int32_t nrects = 0;
+	const rect_t *rects = pixman_region32_rectangles((region_t *)src, &nrects);
+	if (!rects || nrects < 1) {
+		return false;
+	}
+
+	xcb_rectangle_t *xrects = ccalloc(nrects, xcb_rectangle_t);
+	for (int32_t i = 0; i < nrects; i++) {
+		xrects[i] =
+		    (xcb_rectangle_t){.x = to_i16_checked(rects[i].x1),
+		                      .y = to_i16_checked(rects[i].y1),
+		                      .width = to_u16_checked(rects[i].x2 - rects[i].x1),
+		                      .height = to_u16_checked(rects[i].y2 - rects[i].y1)};
+	}
+
+	bool success =
+	    XCB_AWAIT_VOID(xcb_xfixes_set_region, c->c, dst, to_u32_checked(nrects), xrects);
+
+	free(xrects);
+
+	return success;
+}
+
 uint32_t x_create_region(struct x_connection *c, const region_t *reg) {
 	if (!reg) {
 		return XCB_NONE;
@@ -562,9 +582,7 @@ _x_strerror(unsigned long serial, uint8_t major, uint16_t minor, uint8_t error_c
 	const char *name = "Unknown";
 
 #define CASESTRRET(s)                                                                    \
-	case s:                                                                          \
-		name = #s;                                                               \
-		break
+	case s: name = #s; break
 
 #define CASESTRRET2(s)                                                                   \
 	case XCB_##s: name = #s; break
@@ -687,27 +705,6 @@ xcb_pixmap_t x_create_pixmap(struct x_connection *c, uint8_t depth, int width, i
 	log_error_x_error(err, "Failed to create pixmap");
 	free(err);
 	return XCB_NONE;
-}
-
-/**
- * Validate a pixmap.
- *
- * Detect whether the pixmap is valid with XGetGeometry. Well, maybe there
- * are better ways.
- */
-bool x_validate_pixmap(struct x_connection *c, xcb_pixmap_t pixmap) {
-	if (pixmap == XCB_NONE) {
-		return false;
-	}
-
-	auto r = xcb_get_geometry_reply(c->c, xcb_get_geometry(c->c, pixmap), NULL);
-	if (!r) {
-		return false;
-	}
-
-	bool ret = r->width && r->height;
-	free(r);
-	return ret;
 }
 
 /// We don't use the _XSETROOT_ID root window property as a source of the background
@@ -856,8 +853,8 @@ void x_create_convolution_kernel(const conv *kernel, double center,
 /// Returns {-1, -1, -1, -1, -1, 0} on failure
 struct xvisual_info x_get_visual_info(struct x_connection *c, xcb_visualid_t visual) {
 	auto pictfmt = x_get_pictform_for_visual(c, visual);
-	auto depth = x_get_visual_depth(c, visual);
-	if (!pictfmt || depth == -1) {
+	auto depth = xcb_aux_get_depth_of_visual(c->screen_info, visual);
+	if (!pictfmt || depth == 0) {
 		log_error("Invalid visual %#03x", visual);
 		return (struct xvisual_info){-1, -1, -1, -1, -1, 0};
 	}
@@ -880,19 +877,6 @@ struct xvisual_info x_get_visual_info(struct x_connection *c, xcb_visualid_t vis
 	    .visual_depth = depth,
 	    .visual = visual,
 	};
-}
-
-xcb_screen_t *x_screen_of_display(struct x_connection *c, int screen) {
-	xcb_screen_iterator_t iter;
-
-	iter = xcb_setup_roots_iterator(xcb_get_setup(c->c));
-	for (; iter.rem; --screen, xcb_screen_next(&iter)) {
-		if (screen == 0) {
-			return iter.data;
-		}
-	}
-
-	return NULL;
 }
 
 void x_update_monitors(struct x_connection *c, struct x_monitors *m) {

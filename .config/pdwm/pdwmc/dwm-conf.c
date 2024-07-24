@@ -1,10 +1,8 @@
 /* See LICENSE file for copyright and license details. */
-#include "dwm.h"
 #include "colors.h"
+#include "dwm.h"
 #include <X11/XF86keysym.h>
 #define LENGTH(X) (sizeof X / sizeof X[0])
-#define TERMINAL "st"
-#define TERMCLASS "St"
 #define MAKETERM(TERMINAL, cmd) TERMINAL cmd
 
 extern void cyclelayout(const Arg *arg);
@@ -46,7 +44,8 @@ extern void dwindle(Monitor *m);
 extern void fibonacci(Monitor *m, int s);
 extern void spiral(Monitor *m);
 extern void tile(Monitor *);
-extern void getgaps(Monitor *m, int *oh, int *ov, int *ih, int *iv, unsigned int *nc);
+extern void getgaps(Monitor *m, int *oh, int *ov, int *ih, int *iv,
+                    unsigned int *nc);
 extern void setgaps(int oh, int ov, int ih, int iv);
 extern void shifttag(const Arg *arg);
 extern void shiftview(const Arg *arg);
@@ -66,63 +65,59 @@ char dmenufont[] = "JetBrains Mono:style=Regular:size=16";
 char dmenuh[] = "40";
 
 #include "appearance"
-const char **get_fonts()
-{
-	return fonts;
-}
+const char **get_fonts() { return fonts; }
 const int lenfonts = LENGTH(fonts);
 
 char *colors[][3] = {
-	/*               fg           bg           border   */
-	[SchemeNorm] = { black, black, gray2 },
-	[SchemeSel] = { blue2, green, blue },
-	[SchemeTagsSel] = { black, blue, "#000000" },
-	[SchemeTagsNorm] = { blue, black, "#000000" },
-	[SchemeInfoSel] = { blue, black, "#000000" },
-	[SchemeInfoNorm] = { black, black, "#000000" },
-	[SchemeStatus] = { white, black, "#000000" },
-	[SchemeOptimal] = { green, black, "#000000" },
-	[SchemeCritical] = { red, black, "#000000" },
+    /*               fg           bg           border   */
+    [SchemeNorm] = {black, black, gray2},
+    [SchemeSel] = {blue2, green, blue},
+    [SchemeTagsSel] = {black, blue, "#000000"},
+    [SchemeTagsNorm] = {blue, black, "#000000"},
+    [SchemeInfoSel] = {blue, black, "#000000"},
+    [SchemeInfoNorm] = {black, black, "#000000"},
+    [SchemeStatus] = {white, black, "#000000"},
+    [SchemeOptimal] = {green, black, "#000000"},
+    [SchemeCritical] = {red, black, "#000000"},
 };
 
-const char *physettings[] = { "physettings", "NULL" };
+const char *physettings[] = {"physettings", "NULL"};
 
 const Config config[] = {
-	{ physettings, "" },
+    {physettings, ""},
 };
 const int lenconfig = LENGTH(config);
 
 typedef struct {
-	const char *name;
-	const void *cmd;
+  const char *name;
+  const void *cmd;
 } Sp;
-const char *spcmd1[] = { TERMINAL, "-n", "spterm", "-g", "120x34", NULL };
 const Sp scratchpads[] = {
-	/* name          cmd  */
-	{ "spterm", spcmd1 },
+    /* name          cmd  */
+    {"spterm"},
 };
 
 /* tagging */
-const char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+const char *tags[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
 
 /* layout(s) */
-const float mfact = 0.55; /* factor of master area size [0.05..0.95] */
-const int nmaster = 1; /* number of clients in master area */
+const float mfact = 0.55;  /* factor of master area size [0.05..0.95] */
+const int nmaster = 1;     /* number of clients in master area */
 const int resizehints = 1; /* 1 means respect size hints in tiled resizals */
-#define FORCE_VSPLIT 1 /* nrowgrid layout: force two clients to always split vertically */
+#define FORCE_VSPLIT                                                           \
+  1 /* nrowgrid layout: force two clients to always split vertically */
 const Layout layouts[] = {
-	/* symbol     arrange function */
-	{ "[]=", tile }, /* Default: Master on left, slaves on right */
-	{ "TTT", bstack }, /* Master on top, slaves on bottom */
-	{ "[M]", monocle }, /* All windows on top of eachother */
-	{ "H[]", deck }, /* Master on left, slaves in monocle-like mode on right */
-	{ "[@]", spiral }, /* Fibonacci spiral */
-	{ "[\\]", dwindle }, /* Decreasing in size right and leftward */
-	{ "|M|", centeredmaster }, /* Master in middle, slaves on sides */
-	{ ">M>", centeredfloatingmaster }, /* Same but master floats */
-	{ "><>", NULL }, /* no layout function means floating behavior */
-	{ NULL, NULL }
-};
+    /* symbol     arrange function */
+    {"[]=", tile},    /* Default: Master on left, slaves on right */
+    {"TTT", bstack},  /* Master on top, slaves on bottom */
+    {"[M]", monocle}, /* All windows on top of eachother */
+    {"H[]", deck},    /* Master on left, slaves in monocle-like mode on right */
+    {"[@]", spiral},  /* Fibonacci spiral */
+    {"[\\]", dwindle},               /* Decreasing in size right and leftward */
+    {"|M|", centeredmaster},         /* Master in middle, slaves on sides */
+    {">M>", centeredfloatingmaster}, /* Same but master floats */
+    {"><>", NULL}, /* no layout function means floating behavior */
+    {NULL, NULL}};
 
 /* key definitions */
 #ifndef KEY_DEFS
@@ -158,33 +153,27 @@ const Layout layouts[] = {
 #include "buttons"
 const int lenbuttons = LENGTH(buttons);
 
-const Button *get_buttons()
-{
-	return &buttons[0];
-}
+const Button *get_buttons() { return &buttons[0]; }
 
 /* commands */
 char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
-const char *dmenucmd[] = { "dmenu_run", "-m",  dmenumon, "-fn", dmenufont, "-nb",
-			   "#000000",	"-nf", blue,	 "-sb", blue,	   "-sf",
-			   black,	"-h",  dmenuh,	 NULL };
-const char *termcmd[]  = { "alacritty", NULL };
-const char *browsercmd[] = { "brave", NULL	};
-const char *discord[] = { "discord", NULL};
+const char *dmenucmd[] = {"dmenu_run", "-m",  dmenumon, "-fn", dmenufont, "-nb",
+                          "#000000",   "-nf", blue,     "-sb", blue,      "-sf",
+                          black,       "-h",  dmenuh,   NULL};
+const char *termcmd[] = {"alacritty", NULL};
+const char *browsercmd[] = {"brave", NULL};
+const char *discord[] = {"discord", NULL};
 const char *flameshot[] = {"flameshot", "gui", NULL};
 const char *quit[] = {"killall", "pdwm", NULL};
+const char *virt[] = {"virt-manager", NULL};
+const char *roblox[] = {"test", NULL};
+const char *minecraft[] = {"sklauncher", NULL};
 const char *layoutmenu_cmd = "pOS-layoutmenu";
 #include "keys"
 const int lenkeys = LENGTH(keys);
 
-const Key *get_keys()
-{
-	return &keys[0];
-}
+const Key *get_keys() { return &keys[0]; }
 
 #include "rules"
 const int lenrules = LENGTH(rules);
-const Rule *get_rules()
-{
-	return &rules[0];
-}
+const Rule *get_rules() { return &rules[0]; }

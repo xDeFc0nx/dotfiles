@@ -181,7 +181,7 @@ bool glx_init(session_t *ps, bool need_render) {
 	// must precede FBConfig fetching
 	if (need_render) {
 		psglx->has_texture_non_power_of_two =
-		    gl_has_extension("GL_ARB_texture_non_power_of_two");
+		    epoxy_has_gl_extension("GL_ARB_texture_non_power_of_two");
 	}
 
 	// Render preparations
@@ -279,7 +279,7 @@ void glx_destroy(session_t *ps) {
 
 	free(ps->psglx);
 	ps->psglx = NULL;
-	ps->argb_fbconfig = NULL;
+	ps->argb_fbconfig = (struct glx_fbconfig_info){0};
 }
 
 /**
@@ -1129,7 +1129,7 @@ glx_blur_dst_end:
 // TODO(bhagwan) this is a mess and needs a more consistent way of getting the border
 // pixel I tried looking for a notify event for XCB_CW_BORDER_PIXEL (in
 // xcb_create_window()) or a way to get the pixels from xcb_render_picture_t but the
-// documentation for the xcb_xrender extension is literaly non existent...
+// documentation for the xcb_xrender extension is literally non existent...
 //
 // NOTE(yshui) There is no consistent way to get the "border" color of a X window. From
 // the WM's perspective there are multiple ways to implement window borders. Using

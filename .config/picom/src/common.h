@@ -190,7 +190,7 @@ typedef struct session {
 	/// Picture of the root window background.
 	paint_t root_tile_paint;
 	/// The backend data the root pixmap bound to
-	void *root_image;
+	image_handle root_image;
 	/// A region of the size of the screen.
 	region_t screen_reg;
 	/// Picture of root window. Destination of painting in no-DBE painting
@@ -208,7 +208,7 @@ typedef struct session {
 	/// Custom GLX program used for painting window.
 	// XXX should be in struct glx_session
 	glx_prog_main_t glx_prog_win;
-	struct glx_fbconfig_info *argb_fbconfig;
+	struct glx_fbconfig_info argb_fbconfig;
 #endif
 	/// Sync fence to sync draw operations
 	xcb_sync_fence_t sync_fence;
@@ -244,8 +244,8 @@ typedef struct session {
 	/// Either the backend is currently rendering a frame, or a frame has been
 	/// rendered but has yet to be presented. In either case, we should not start
 	/// another render right now. As if we start issuing rendering commands now, we
-	/// will have to wait for either the the current render to finish, or the current
-	/// back buffer to be become available again. In either case, we will be wasting
+	/// will have to wait for either the current render to finish, or the current
+	/// back buffer to become available again. In either case, we will be wasting
 	/// time.
 	bool backend_busy;
 	/// Whether a render is queued. This generally means there are pending updates
@@ -279,7 +279,7 @@ typedef struct session {
 	struct x_convolution_kernel **blur_kerns_cache;
 	/// If we should quit
 	bool quit : 1;
-	// TODO(yshui) use separate flags for dfferent kinds of updates so we don't
+	// TODO(yshui) use separate flags for different kinds of updates so we don't
 	// waste our time.
 	/// Whether there are pending updates, like window creation, etc.
 	bool pending_updates : 1;

@@ -246,7 +246,7 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 	auto after_damage_us = (uint64_t)now.tv_sec * 1000000UL + (uint64_t)now.tv_nsec / 1000;
 	log_trace("Getting damage took %" PRIu64 " us", after_damage_us - after_sync_fence_us);
 	if (ps->next_render > 0) {
-		log_verbose("Render schedule deviation: %ld us (%s) %" PRIu64 " %ld",
+		log_verbose("Render schedule deviation: %ld us (%s) %" PRIu64 " %" PRIu64,
 		            labs((long)after_damage_us - (long)ps->next_render),
 		            after_damage_us < ps->next_render ? "early" : "late",
 		            after_damage_us, ps->next_render);
@@ -527,7 +527,7 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 			                               &reg_paint_in_bound, &reg_visible, true);
 		} else {
 			if (is_animating && w->old_win_image) {
-				bool is_focused = win_is_focused_raw(ps, w);
+				bool is_focused = win_is_focused_raw(w);
 				if (!is_focused && w->focused && w->opacity_is_set)
 					is_focused = true;
 				assert(w->old_win_image);

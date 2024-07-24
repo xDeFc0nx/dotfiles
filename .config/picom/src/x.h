@@ -27,6 +27,7 @@ typedef struct winprop {
 		int16_t *p16;
 		int32_t *p32;
 		uint32_t *c32;        // 32bit cardinal
+		xcb_atom_t *atom;
 	};
 	unsigned long nitems;
 	xcb_atom_t type;
@@ -208,17 +209,6 @@ void x_discard_pending(struct x_connection *c, uint32_t sequence);
 void x_handle_error(struct x_connection *c, xcb_generic_error_t *ev);
 
 /**
- * Send a request to X server and get the reply to make sure all previous
- * requests are processed, and their replies received
- *
- * xcb_get_input_focus is used here because it is the same request used by
- * libX11
- */
-static inline void x_sync(struct x_connection *c) {
-	free(xcb_get_input_focus_reply(c->c, xcb_get_input_focus(c->c), NULL));
-}
-
-/**
  * Get a specific attribute of a window.
  *
  * Returns a blank structure if the returned type and format does not
@@ -271,12 +261,11 @@ xcb_window_t wid_get_prop_window(struct x_connection *c, xcb_window_t wid, xcb_a
  *                     array
  * @param[out] pnstr   Number of strings in the array
  */
-bool wid_get_text_prop(session_t *ps, xcb_window_t wid, xcb_atom_t prop, char ***pstrlst,
-                       int *pnstr);
+bool wid_get_text_prop(struct x_connection *c, struct atom *atoms, xcb_window_t wid,
+                       xcb_atom_t prop, char ***pstrlst, int *pnstr);
 
 const xcb_render_pictforminfo_t *
 x_get_pictform_for_visual(struct x_connection *, xcb_visualid_t);
-int x_get_visual_depth(struct x_connection *, xcb_visualid_t);
 
 xcb_render_picture_t
 x_create_picture_with_pictfmt_and_pixmap(struct x_connection *,
@@ -321,6 +310,9 @@ x_create_picture_with_visual(struct x_connection *, int w, int h, xcb_visualid_t
 /// Fetch a X region and store it in a pixman region
 bool x_fetch_region(struct x_connection *, xcb_xfixes_region_t r, region_t *res);
 
+/// Set an X region to a pixman region
+bool x_set_region(struct x_connection *c, xcb_xfixes_region_t dst, const region_t *src);
+
 /// Create a X region from a pixman region
 uint32_t x_create_region(struct x_connection *c, const region_t *reg);
 
@@ -355,8 +347,6 @@ void x_log_error(enum log_level level, unsigned long serial, uint8_t major,
 const char *x_strerror(xcb_generic_error_t *e);
 
 xcb_pixmap_t x_create_pixmap(struct x_connection *, uint8_t depth, int width, int height);
-
-bool x_validate_pixmap(struct x_connection *, xcb_pixmap_t pxmap);
 
 /**
  * Free a <code>winprop_t</code>.
@@ -408,10 +398,10 @@ struct xvisual_info x_get_visual_info(struct x_connection *c, xcb_visualid_t vis
 
 xcb_visualid_t x_get_visual_for_standard(struct x_connection *c, xcb_pict_standard_t std);
 
+xcb_visualid_t x_get_visual_for_depth(xcb_screen_t *screen, uint8_t depth);
+
 xcb_render_pictformat_t
 x_get_pictfmt_for_standard(struct x_connection *c, xcb_pict_standard_t std);
-
-xcb_screen_t *x_screen_of_display(struct x_connection *c, int screen);
 
 /// Populates a `struct x_monitors` with the current monitor configuration.
 void x_update_monitors(struct x_connection *, struct x_monitors *);

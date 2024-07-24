@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2019, Yuxuan Shui <yshuiv7@gmail.com>
 
+#include <stdint.h>
 #include <stdio.h>
 
 #include <X11/Xlibint.h>
@@ -29,7 +30,7 @@
 /// made the query when those events were already in the queue. so the reply you got is
 /// more up-to-date than the events). Also, handling events when other client are making
 /// concurrent requests is not good. Because the server states are changing without you
-/// knowning them. This is super racy, and can cause lots of potential problems.
+/// knowing them. This is super racy, and can cause lots of potential problems.
 ///
 /// All of above mandates we do these things:
 ///    1. Grab server when handling events
@@ -47,8 +48,14 @@
 /// When top half finished, we enter the render stage, where no server state should be
 /// queried. All rendering should be done with our internal knowledge of the server state.
 ///
+/// P.S. There is another reason to avoid sending any request to the server as much as
+/// possible. To make sure requests are sent, flushes are needed. And `xcb_flush`/`XFlush`
+/// functions may read more events from the server into their queues. This is
+/// undesirable, see the comments on `handle_queued_x_events` in picom.c for more details.
 
-// TODO(yshui) the things described above
+// TODO(yshui) the things described above. This is mostly done, maybe some of
+//             the functions here is still making unnecessary queries, we need
+//             to do some auditing to be sure.
 
 /**
  * Get a window's name from window ID.
@@ -324,7 +331,7 @@ static inline void ev_reparent_notify(session_t *ps, xcb_reparent_notify_event_t
 	}
 
 	if (ev->parent == ps->c.screen_info->root) {
-		// X will generate reparent notifiy even if the parent didn't actually
+		// X will generate reparent notify even if the parent didn't actually
 		// change (i.e. reparent again to current parent). So we check if that's
 		// the case
 		auto w = find_win(ps, ev->window);
@@ -350,19 +357,14 @@ static inline void ev_reparent_notify(session_t *ps, xcb_reparent_notify_event_t
 		}
 
 		// Reset event mask in case something wrong happens
-		xcb_change_window_attributes(
-		    ps->c.c, ev->window, XCB_CW_EVENT_MASK,
-		    (const uint32_t[]){determine_evmask(ps, ev->window, WIN_EVMODE_UNKNOWN)});
+		uint32_t evmask = determine_evmask(ps, ev->window, WIN_EVMODE_UNKNOWN);
 
 		if (!wid_has_prop(ps, ev->window, ps->atoms->aWM_STATE)) {
 			log_debug("Window %#010x doesn't have WM_STATE property, it is "
 			          "probably not a client window. But we will listen for "
 			          "property change in case it gains one.",
 			          ev->window);
-			xcb_change_window_attributes(
-			    ps->c.c, ev->window, XCB_CW_EVENT_MASK,
-			    (const uint32_t[]){determine_evmask(ps, ev->window, WIN_EVMODE_UNKNOWN) |
-			                       XCB_EVENT_MASK_PROPERTY_CHANGE});
+			evmask |= XCB_EVENT_MASK_PROPERTY_CHANGE;
 		} else {
 			auto w_real_top = find_managed_window_or_parent(ps, ev->parent);
 			if (w_real_top && w_real_top->state != WSTATE_UNMAPPED &&
@@ -386,6 +388,8 @@ static inline void ev_reparent_notify(session_t *ps, xcb_reparent_notify_event_t
 				}
 			}
 		}
+		XCB_AWAIT_VOID(xcb_change_window_attributes, ps->c.c, ev->window,
+		               XCB_CW_EVENT_MASK, (const uint32_t[]){evmask});
 	}
 }
 
@@ -465,7 +469,7 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 			}
 		}
 
-		// Unconcerned about any other proprties on root window
+		// Unconcerned about any other properties on root window
 		return;
 	}
 
@@ -475,9 +479,10 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 		// Check whether it could be a client window
 		if (!find_toplevel(ps, ev->window)) {
 			// Reset event mask anyway
-			xcb_change_window_attributes(ps->c.c, ev->window, XCB_CW_EVENT_MASK,
-			                             (const uint32_t[]){determine_evmask(
-			                                 ps, ev->window, WIN_EVMODE_UNKNOWN)});
+			const uint32_t evmask =
+			    determine_evmask(ps, ev->window, WIN_EVMODE_UNKNOWN);
+			XCB_AWAIT_VOID(xcb_change_window_attributes, ps->c.c, ev->window,
+			               XCB_CW_EVENT_MASK, (const uint32_t[]){evmask});
 
 			auto w_top = find_managed_window_or_parent(ps, ev->window);
 			// ev->window might have not been managed yet, in that case w_top
@@ -492,14 +497,14 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 	// If _NET_WM_WINDOW_TYPE changes... God knows why this would happen, but
 	// there are always some stupid applications. (#144)
 	if (ev->atom == ps->atoms->a_NET_WM_WINDOW_TYPE) {
-		struct managed_win *w = NULL;
-		if ((w = find_toplevel(ps, ev->window))) {
+		struct managed_win *w = find_toplevel(ps, ev->window);
+		if (w) {
 			win_set_property_stale(w, ev->atom);
 		}
 	}
 
 	if (ev->atom == ps->atoms->a_NET_WM_BYPASS_COMPOSITOR) {
-		// Unnecessay until we remove the queue_redraw in ev_handle
+		// Unnecessary until we remove the queue_redraw in ev_handle
 		queue_redraw(ps);
 	}
 
@@ -560,6 +565,13 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 		}
 	}
 
+	if (!ps->o.no_ewmh_fullscreen && ev->atom == ps->atoms->a_NET_WM_STATE) {
+		auto w = find_toplevel(ps, ev->window);
+		if (w) {
+			win_set_property_stale(w, ev->atom);
+		}
+	}
+
 	// Check for other atoms we are tracking
 	for (latom_t *platom = ps->track_atom_lst; platom; platom = platom->next) {
 		if (platom->atom == ev->atom) {
@@ -586,16 +598,28 @@ static inline void repair_win(session_t *ps, struct managed_win *w) {
 	region_t parts;
 	pixman_region32_init(&parts);
 
+	// If this is the first time this window is damaged, we would redraw the
+	// whole window, so we don't need to fetch the damage region. But we still need
+	// to make sure the X server receives the DamageSubtract request, hence the
+	// `xcb_request_check` here.
+	// Otherwise, we fetch the damage regions. That means we will receive a reply
+	// from the X server, which implies it has received our DamageSubtract request.
 	if (!w->ever_damaged) {
-		win_extents(w, &parts);
-		if (!ps->o.show_all_xerrors) {
-			set_ignore_cookie(&ps->c, xcb_damage_subtract(ps->c.c, w->damage,
-			                                              XCB_NONE, XCB_NONE));
+		auto e = xcb_request_check(
+		    ps->c.c, xcb_damage_subtract(ps->c.c, w->damage, XCB_NONE, XCB_NONE));
+		if (e) {
+			if (ps->o.show_all_xerrors) {
+				x_print_error(e->sequence, e->major_code, e->minor_code,
+				              e->error_code);
+			}
+			free(e);
 		}
+		win_extents(w, &parts);
 	} else {
+		auto cookie =
+		    xcb_damage_subtract(ps->c.c, w->damage, XCB_NONE, ps->damaged_region);
 		if (!ps->o.show_all_xerrors) {
-			set_ignore_cookie(&ps->c, xcb_damage_subtract(ps->c.c, w->damage, XCB_NONE,
-			                                              ps->damaged_region));
+			set_ignore_cookie(&ps->c, cookie);
 		}
 		x_fetch_region(&ps->c, ps->damaged_region, &parts);
 		pixman_region32_translate(&parts, w->g.x + w->g.border_width,

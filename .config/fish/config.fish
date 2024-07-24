@@ -14,7 +14,9 @@ set -e fish_user_paths
 set -U fish_user_paths $HOME/.local/bin $HOME/Applications $fish_user_paths
 set -x PATH $HOME/scripts $PATH
 ### EXPORT ###
-set fish_greeting                                 # Supresses fish's intro message
+set fish_greeting # Supresses fish's intro message
+
+set -x GPG_TTY (tty)
 
 ### SET MANPAGER
 ### Uncomment only one of these!
@@ -89,7 +91,7 @@ end
 # Spark functions
 function letters
     cat $argv | awk -vFS='' '{for(i=1;i<=NF;i++){ if($i~/[a-zA-Z]/) { w[tolower($i)]++} } }END{for(i in w) print i,w[i]}' | sort | cut -c 3- | spark | lolcat
-    printf  '%s\n' 'abcdefghijklmnopqrstuvwxyz'  ' ' | lolcat
+    printf '%s\n' abcdefghijklmnopqrstuvwxyz ' ' | lolcat
 end
 
 function commits
@@ -98,30 +100,31 @@ end
 
 # Functions needed for !! and !$
 function __history_previous_command
-  switch (commandline -t)
-  case "!"
-    commandline -t $history[1]; commandline -f repaint
-  case "*"
-    commandline -i !
-  end
+    switch (commandline -t)
+        case "!"
+            commandline -t $history[1]
+            commandline -f repaint
+        case "*"
+            commandline -i !
+    end
 end
 
 function __history_previous_command_arguments
-  switch (commandline -t)
-  case "!"
-    commandline -t ""
-    commandline -f history-token-search-backward
-  case "*"
-    commandline -i '$'
-  end
+    switch (commandline -t)
+        case "!"
+            commandline -t ""
+            commandline -f history-token-search-backward
+        case "*"
+            commandline -i '$'
+    end
 end
 # The bindings for !! and !$
-if [ $fish_key_bindings = "fish_vi_key_bindings" ];
-  bind -Minsert ! __history_previous_command
-  bind -Minsert '$' __history_previous_command_arguments
+if [ $fish_key_bindings = fish_vi_key_bindings ]
+    bind -Minsert ! __history_previous_command
+    bind -Minsert '$' __history_previous_command_arguments
 else
-  bind ! __history_previous_command
-  bind '$' __history_previous_command_arguments
+    bind ! __history_previous_command
+    bind '$' __history_previous_command_arguments
 end
 
 # Function for creating a backup file
@@ -137,8 +140,8 @@ end
 function copy
     set count (count $argv | tr -d \n)
     if test "$count" = 2; and test -d "$argv[1]"
-	set from (echo $argv[1] | trim-right /)
-	set to (echo $argv[2])
+        set from (echo $argv[1] | trim-right /)
+        set to (echo $argv[2])
         command cp -r $from $to
     else
         command cp $argv
@@ -198,8 +201,8 @@ alias vpn='sudo openvpn --config pc.ovpn'
 alias doas="doas --"
 alias edit-fish='vim ~/.config/fish/config.fish'
 alias play='aplay -q'
-alias config='/usr/bin/git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
-
+alias config='/usr/bin/git --git-dir=$HOME/dotfiles --work-tree=$HOME'
+alias docker="sudo docker"
 # navigation
 alias ..='cd ..'
 alias ...='cd ../..'
@@ -218,20 +221,20 @@ alias doompurge="~/.emacs.d/bin/doom purge"
 
 # Changing "ls" to "exa"
 alias ls='exa -al --color=always --group-directories-first' # my preferred listing
-alias la='exa -a --color=always --group-directories-first'  # all files and dirs
-alias ll='exa -l --color=always --group-directories-first'  # long format
+alias la='exa -a --color=always --group-directories-first' # all files and dirs
+alias ll='exa -l --color=always --group-directories-first' # long format
 alias lt='exa -aT --color=always --group-directories-first' # tree listing
 alias l.='exa -a | egrep "^\."'
 
 # pacman and yay
-alias pacsyu='sudo pacman -Syyu'                 # update only standard pkgs
-alias yaysua='yay -Sua --noconfirm'              # update only AUR pkgs (yay)
-alias yaysyu='yay -Syu --noconfirm'              # update standard pkgs and AUR pkgs (yay)
-alias parsua='paru -Sua --noconfirm'             # update only AUR pkgs (paru)
-alias parsyu='paru -Syu --noconfirm'             # update standard pkgs and AUR pkgs (paru)
-alias unlock='sudo rm /var/lib/pacman/db.lck'    # remove pacman lock
-alias cleanup='sudo pacman -Rns (pacman -Qtdq)'  # remove orphaned packages
-alias update='sudo pacman -Syu --noconfirm && yay -Syu --noconrim'
+alias pacsyu='sudo pacman -Syyu' # update only standard pkgs
+alias yaysua='yay -Sua --noconfirm' # update only AUR pkgs (yay)
+alias yaysyu='yay -Syu --noconfirm' # update standard pkgs and AUR pkgs (yay)
+alias parsua='paru -Sua --noconfirm' # update only AUR pkgs (paru)
+alias parsyu='paru -Syu --noconfirm' # update standard pkgs and AUR pkgs (paru)
+alias unlock='sudo rm /var/lib/pacman/db.lck' # remove pacman lock
+alias cleanup='sudo pacman -Rns (pacman -Qtdq)' # remove orphaned packages
+#alias update='sudo pacman -Syu --noconfirm && yay -Syu --noconrim'
 
 # get fastest mirrors
 alias mirror="sudo reflector -f 30 -l 30 --number 10 --verbose --save /etc/pacman.d/mirrorlist"
@@ -245,13 +248,13 @@ alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
 
 # confirm before overwriting something
-alias cp="cp -i"
+#alias cp="cp -i"
 alias mv='mv -i'
 alias rm='rm -i'
 
 # adding flags
-alias df='df -h'                          # human-readable sizes
-alias free='free -m'                      # show sizes in MB
+alias df='df -h' # human-readable sizes
+alias free='free -m' # show sizes in MB
 alias lynx='lynx -cfg=~/.lynx/lynx.cfg -lss=~/.lynx/lynx.lss -vikeys'
 alias vifm='./.config/vifm/scripts/vifmrun'
 alias ncmpcpp='ncmpcpp ncmpcpp_directory=$HOME/.config/ncmpcpp/'
@@ -289,15 +292,15 @@ alias gpg-check="gpg2 --keyserver-options auto-key-retrieve --verify"
 alias gpg-retrieve="gpg2 --keyserver-options auto-key-retrieve --receive-keys"
 
 # youtube-dl
-alias yta-aac="youtube-dl --extract-audio --audio-format aac "
-alias yta-best="youtube-dl --extract-audio --audio-format best "
-alias yta-flac="youtube-dl --extract-audio --audio-format flac "
-alias yta-m4a="youtube-dl --extract-audio --audio-format m4a "
-alias yta-mp3="youtube-dl --extract-audio --audio-format mp3 "
-alias yta-opus="youtube-dl --extract-audio --audio-format opus "
-alias yta-vorbis="youtube-dl --extract-audio --audio-format vorbis "
-alias yta-wav="youtube-dl --extract-audio --audio-format wav "
-alias ytv-best="youtube-dl -f bestvideo+bestaudio "
+alias yta-aac="yt-dlp --extract-audio --audio-format aac "
+alias yta-best="yt-dlp --extract-audio --audio-format best "
+alias yta-flac="yt-dlp --extract-audio --audio-format flac "
+alias yta-m4a="yt-dlp --extract-audio --audio-format m4a "
+alias yta-mp3="yt-dlp --extract-audio --audio-format mp3 "
+alias yta-opus="yt-dlp --extract-audio --audio-format opus "
+alias yta-vorbis="yt-dlp --extract-audio --audio-format vorbis "
+alias yta-wav="yt-dlp --extract-audio --audio-format wav "
+alias ytv-best="yt-dlp -f bestvideo+bestaudio "
 
 # switch between shells
 # I do not recommend switching default SHELL from bash.

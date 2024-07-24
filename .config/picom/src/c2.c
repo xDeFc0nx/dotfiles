@@ -1047,7 +1047,7 @@ static bool c2_l_postprocess(session_t *ps, c2_l_t *pleaf) {
 
 	// Get target atom if it's not a predefined one
 	if (pleaf->predef == C2_L_PUNDEFINED) {
-		pleaf->tgtatom = get_atom(ps->atoms, pleaf->tgt);
+		pleaf->tgtatom = get_atom(ps->atoms, pleaf->tgt, ps->c.c);
 		if (!pleaf->tgtatom) {
 			log_error("Failed to get atom for target \"%s\".", pleaf->tgt);
 			return false;
@@ -1380,14 +1380,10 @@ static inline void c2_match_once_leaf(session_t *ps, const struct managed_win *w
 			case C2_L_PWIDTHB: predef_target = w->widthb; break;
 			case C2_L_PHEIGHTB: predef_target = w->heightb; break;
 			case C2_L_PBDW: predef_target = w->g.border_width; break;
-			case C2_L_PFULLSCREEN:
-				predef_target = win_is_fullscreen(ps, w);
-				break;
+			case C2_L_PFULLSCREEN: predef_target = w->is_fullscreen; break;
 			case C2_L_POVREDIR: predef_target = w->a.override_redirect; break;
 			case C2_L_PARGB: predef_target = win_has_alpha(w); break;
-			case C2_L_PFOCUSED:
-				predef_target = win_is_focused_raw(ps, w);
-				break;
+			case C2_L_PFOCUSED: predef_target = win_is_focused_raw(w); break;
 			case C2_L_PWMWIN: predef_target = w->wmwin; break;
 			case C2_L_PBSHAPED: predef_target = w->bounding_shaped; break;
 			case C2_L_PROUNDED: predef_target = w->rounded_corners; break;
@@ -1513,7 +1509,8 @@ static inline void c2_match_once_leaf(session_t *ps, const struct managed_win *w
 		else {
 			char **strlst = NULL;
 			int nstr = 0;
-			if (wid_get_text_prop(ps, wid, pleaf->tgtatom, &strlst, &nstr)) {
+			if (wid_get_text_prop(&ps->c, ps->atoms, wid, pleaf->tgtatom,
+			                      &strlst, &nstr)) {
 				if (pleaf->index < 0 && nstr > 0 && strlen(strlst[0]) > 0) {
 					ntargets = to_u32_checked(nstr);
 					targets = (const char **)strlst;

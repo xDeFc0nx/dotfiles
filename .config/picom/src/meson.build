@@ -23,7 +23,7 @@ required_xcb_packages = [
 # Some XCB packages are here because their versioning differs (see check below).
 required_packages = [
 	'pixman-1', 'x11', 'x11-xcb', 'xcb-image', 'xcb-renderutil', 'xcb-util',
-	'xext'
+	'xext', 'threads',
 ]
 
 foreach i : required_packages
@@ -58,8 +58,8 @@ if get_option('vsync_drm')
 endif
 
 if get_option('opengl')
-	cflags += ['-DCONFIG_OPENGL', '-DGL_GLEXT_PROTOTYPES']
-	deps += [dependency('gl', required: true), dependency('egl', required: true), dependency('threads', required:true)]
+	cflags += ['-DCONFIG_OPENGL']
+	deps += [dependency('epoxy', required: true)]
 	srcs += [ 'opengl.c' ]
 endif
 

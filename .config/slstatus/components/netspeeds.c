@@ -7,7 +7,7 @@
 
 #if defined(__linux__)
 	#include <stdint.h>
-
+	
 	#define NET_RX_BYTES "/sys/class/net/%s/statistics/rx_bytes"
 	#define NET_TX_BYTES "/sys/class/net/%s/statistics/tx_bytes"
 

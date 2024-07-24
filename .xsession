@@ -11,15 +11,16 @@ xset fp rehash
 setxkbmap us
 
 # screen resolution
-xrandr --output Virtual-1 --mode 1920x1080 &
+xrandr --output HDMI-1 --mode 1920x1080 &
+xrandr --output eDP-1 --off &
+nm-applet &
 xset led 3 &
 randomWallpaper &
 picom --animations -b &
 slstatus &
 dunst &
 flameshot &
-
 #welcome &
-
+updatedb &
 # Start your wm!
-exec pdwm
+# #exec pdwm

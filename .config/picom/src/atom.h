@@ -1,6 +1,4 @@
 #pragma once
-#include <stdlib.h>
-
 #include <xcb/xcb.h>
 
 #include "cache.h"
@@ -23,6 +21,7 @@
 	WM_CLIENT_MACHINE, \
 	_NET_ACTIVE_WINDOW, \
 	_COMPTON_SHADOW, \
+	COMPTON_VERSION, \
 	_NET_WM_WINDOW_TYPE, \
 	_XROOTPMAP_ID, \
 	ESETROOT_PMAP_ID, \
@@ -52,19 +51,18 @@
 
 #define ATOM_DEF(x) xcb_atom_t a##x
 
+struct atom_entry;
 struct atom {
-	struct cache *c;
+	struct cache c;
 	LIST_APPLY(ATOM_DEF, SEP_COLON, ATOM_LIST1);
 	LIST_APPLY(ATOM_DEF, SEP_COLON, ATOM_LIST2);
 };
 
-struct atom *init_atoms(xcb_connection_t *);
+/// Create a new atom object with a xcb connection. `struct atom` does not hold
+/// a reference to the connection.
+struct atom *init_atoms(xcb_connection_t *c);
 
-static inline xcb_atom_t get_atom(struct atom *a, const char *key) {
-	return (xcb_atom_t)(intptr_t)cache_get(a->c, key, NULL);
-}
+xcb_atom_t get_atom(struct atom *a, const char *key, xcb_connection_t *c);
+xcb_atom_t get_atom_cached(struct atom *a, const char *key);
 
-static inline void destroy_atoms(struct atom *a) {
-	cache_free(a->c);
-	free(a);
-}
+void destroy_atoms(struct atom *a);

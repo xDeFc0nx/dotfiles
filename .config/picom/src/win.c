@@ -74,6 +74,11 @@ win_update_frame_extents(session_t *ps, struct managed_win *w, xcb_window_t clie
 static void win_update_prop_shadow_raw(session_t *ps, struct managed_win *w);
 static void win_update_prop_shadow(session_t *ps, struct managed_win *w);
 /**
+ * Update window EWMH fullscreen state.
+ */
+bool win_update_prop_fullscreen(struct x_connection *c, const struct atom *atoms,
+                                struct managed_win *w);
+/**
  * Update leader of a window.
  */
 static void win_update_leader(session_t *ps, struct managed_win *w);
@@ -134,10 +139,10 @@ static inline bool attr_pure win_is_real_visible(const struct managed_win *w) {
  * Update focused state of a window.
  */
 static void win_update_focused(session_t *ps, struct managed_win *w) {
-	if (UNSET != w->focused_force) {
+	if (w->focused_force != UNSET) {
 		w->focused = w->focused_force;
 	} else {
-		w->focused = win_is_focused_raw(ps, w);
+		w->focused = win_is_focused_raw(w);
 
 		// Use wintype_focus, and treat WM windows and override-redirected
 		// windows specially
@@ -205,7 +210,7 @@ static inline bool group_is_focused(session_t *ps, xcb_window_t leader) {
 			continue;
 		}
 		auto mw = (struct managed_win *)w;
-		if (win_get_leader(ps, mw) == leader && win_is_focused_raw(ps, mw)) {
+		if (win_get_leader(ps, mw) == leader && win_is_focused_raw(mw)) {
 			return true;
 		}
 	}
@@ -465,6 +470,12 @@ static void win_update_properties(session_t *ps, struct managed_win *w) {
 		win_update_prop_shadow(ps, w);
 	}
 
+	if (win_fetch_and_unset_property_stale(w, ps->atoms->a_NET_WM_STATE)) {
+		if (win_update_prop_fullscreen(&ps->c, ps->atoms, w)) {
+			win_set_flags(w, WIN_FLAGS_FACTOR_CHANGED);
+		}
+	}
+
 	if (win_fetch_and_unset_property_stale(w, ps->atoms->aWM_CLIENT_LEADER) ||
 	    win_fetch_and_unset_property_stale(w, ps->atoms->aWM_TRANSIENT_FOR)) {
 		win_update_leader(ps, w);
@@ -484,18 +495,19 @@ static void init_animation(session_t *ps, struct managed_win *w) {
 	}
 	static double *anim_x, *anim_y, *anim_w, *anim_h;
 	enum open_window_animation animation;
-	if (ps->o.wintype_option[w->window_type].animation != OPEN_WINDOW_ANIMATION_INVALID
-		&& !w->dwm_mask) {
-		animation = ps->o.wintype_option[w->window_type].animation;
-	}
-	else
-		animation = ps->o.animation_for_open_window;
+
+
+	animation = ps->o.animation_for_open_window;
 
 	if (w->window_type != WINTYPE_TOOLTIP &&
 		wid_has_prop(ps, w->client_win, ps->atoms->aWM_TRANSIENT_FOR)) {
 		animation = ps->o.animation_for_transient_window;
 	}
 
+	if (ps->o.wintype_option[w->window_type].animation != OPEN_WINDOW_ANIMATION_INVALID
+		&& !w->dwm_mask) {
+		animation = ps->o.wintype_option[w->window_type].animation;
+	}
 
 	anim_x = &w->animation_center_x, anim_y = &w->animation_center_y;
 	anim_w = &w->animation_w, anim_h = &w->animation_h;
@@ -644,7 +656,8 @@ void win_process_update_flags(session_t *ps, struct managed_win *w) {
 	// Whether the window was visible before we process the mapped flag. i.e.
 	// is the window just mapped.
 	bool was_visible = win_is_real_visible(w);
-	log_trace("Processing flags for window %#010x (%s), was visible: %d, flags: %#lx",
+	log_trace("Processing flags for window %#010x (%s), was visible: %d, flags: "
+	          "%#" PRIx64,
 	          w->base.id, w->name, was_visible, w->flags);
 
 	if (win_check_flags_all(w, WIN_FLAGS_MAPPED)) {
@@ -752,6 +765,9 @@ void win_process_update_flags(session_t *ps, struct managed_win *w) {
 		} else {
 			w->g = w->pending_g;
 		}
+
+		// Whether a window is fullscreen changes based on its geometry
+		win_update_is_fullscreen(ps, w);
 
 		if (win_check_flags_all(w, WIN_FLAGS_SIZE_STALE)) {
 			win_on_win_size_change(ps, w);
@@ -888,12 +904,14 @@ int win_update_name(session_t *ps, struct managed_win *w) {
 		return 0;
 	}
 
-	if (!(wid_get_text_prop(ps, w->client_win, ps->atoms->a_NET_WM_NAME, &strlst, &nstr))) {
+	if (!(wid_get_text_prop(&ps->c, ps->atoms, w->client_win,
+	                        ps->atoms->a_NET_WM_NAME, &strlst, &nstr))) {
 		log_debug("(%#010x): _NET_WM_NAME unset, falling back to "
 		          "WM_NAME.",
 		          w->client_win);
 
-		if (!wid_get_text_prop(ps, w->client_win, ps->atoms->aWM_NAME, &strlst, &nstr)) {
+		if (!wid_get_text_prop(&ps->c, ps->atoms, w->client_win,
+		                       ps->atoms->aWM_NAME, &strlst, &nstr)) {
 			log_debug("Unsetting window name for %#010x", w->client_win);
 			free(w->name);
 			w->name = NULL;
@@ -920,7 +938,8 @@ static int win_update_role(session_t *ps, struct managed_win *w) {
 	char **strlst = NULL;
 	int nstr = 0;
 
-	if (!wid_get_text_prop(ps, w->client_win, ps->atoms->aWM_WINDOW_ROLE, &strlst, &nstr)) {
+	if (!wid_get_text_prop(&ps->c, ps->atoms, w->client_win,
+	                       ps->atoms->aWM_WINDOW_ROLE, &strlst, &nstr)) {
 		return -1;
 	}
 
@@ -1077,7 +1096,7 @@ double win_calc_opacity_target(session_t *ps, const struct managed_win *w) {
 	} else {
 		// Respect active_opacity only when the window is physically
 		// focused
-		if (win_is_focused_raw(ps, w)) {
+		if (win_is_focused_raw(w)) {
 			opacity = ps->o.active_opacity;
 		} else if (!w->focused) {
 			// Respect inactive_opacity in some cases
@@ -1221,7 +1240,7 @@ static void win_set_shadow(session_t *ps, struct managed_win *w, bool shadow_new
 
 		// Delayed update of shadow image
 		// By setting WIN_FLAGS_SHADOW_STALE, we ask win_process_flags to
-		// re-create or release the shaodw in based on whether w->shadow
+		// re-create or release the shadow in based on whether w->shadow
 		// is set.
 		win_set_flags(w, WIN_FLAGS_SHADOW_STALE);
 
@@ -1276,6 +1295,30 @@ void win_update_prop_shadow(session_t *ps, struct managed_win *w) {
 	if (w->prop_shadow != attr_shadow_old) {
 		win_determine_shadow(ps, w);
 	}
+}
+
+/**
+ * Update window EWMH fullscreen state.
+ */
+bool win_update_prop_fullscreen(struct x_connection *c, const struct atom *atoms,
+                                struct managed_win *w) {
+	auto prop = x_get_prop(c, w->client_win, atoms->a_NET_WM_STATE, 12, XCB_ATOM_ATOM, 0);
+	if (!prop.nitems) {
+		return false;
+	}
+
+	bool is_fullscreen = false;
+	for (uint32_t i = 0; i < prop.nitems; i++) {
+		if (prop.atom[i] == atoms->a_NET_WM_STATE_FULLSCREEN) {
+			is_fullscreen = true;
+			break;
+		}
+	}
+	free_winprop(&prop);
+
+	bool changed = w->is_ewmh_fullscreen != is_fullscreen;
+	w->is_ewmh_fullscreen = is_fullscreen;
+	return changed;
 }
 
 static void win_determine_clip_shadow_above(session_t *ps, struct managed_win *w) {
@@ -1406,19 +1449,19 @@ static void win_determine_blur_background(session_t *ps, struct managed_win *w) 
  * Determine if a window should have rounded corners.
  */
 static void win_determine_rounded_corners(session_t *ps, struct managed_win *w) {
-	if (ps->o.corner_radius == 0) {
-		w->corner_radius = 0;
-		return;
-	}
-
 	void *radius_override = NULL;
 	if (c2_match(ps, w, ps->o.corner_radius_rules, &radius_override)) {
 		log_debug("Matched corner rule! %d", w->corner_radius);
 	}
 
+	if (ps->o.corner_radius == 0 && !radius_override) {
+		w->corner_radius = 0;
+		return;
+	}
+
 	// Don't round full screen windows & excluded windows,
 	// unless we find a corner override in corner_radius_rules
-	if (!radius_override && ((w && win_is_fullscreen(ps, w)) ||
+	if (!radius_override && ((w && w->is_fullscreen) ||
 	                         c2_match(ps, w, ps->o.rounded_corners_blacklist, NULL))) {
 		w->corner_radius = 0;
 		log_debug("Not rounding corners for window %#010x", w->base.id);
@@ -1485,9 +1528,10 @@ void win_update_opacity_rule(session_t *ps, struct managed_win *w) {
  */
 void win_on_factor_change(session_t *ps, struct managed_win *w) {
 	log_debug("Window %#010x (%s) factor change", w->base.id, w->name);
-	// Focus needs to be updated first, as other rules might depend on the
-	// focused state of the window
+	// Focus and is_fullscreen needs to be updated first, as other rules might depend
+	// on the focused state of the window
 	win_update_focused(ps, w);
+	win_update_is_fullscreen(ps, w);
 
 	win_determine_shadow(ps, w);
 	win_determine_clip_shadow_above(ps, w);
@@ -1537,8 +1581,12 @@ void win_on_win_size_change(session_t *ps, struct managed_win *w) {
 	       w->state != WSTATE_UNMAPPING);
 
 	// Invalidate the shadow we built
-	win_set_flags(w, WIN_FLAGS_IMAGES_STALE);
-	win_release_mask(ps->backend_data, w);
+	// Do not set flags if window is unmapping and animation is running
+	if (w->state != WSTATE_UNMAPPED && w->state != WSTATE_DESTROYING &&
+	       w->state != WSTATE_UNMAPPING) {
+		win_set_flags(w, WIN_FLAGS_IMAGES_STALE);
+		win_release_mask(ps->backend_data, w);
+	}
 	ps->pending_updates = true;
 	free_paint(ps, &w->shadow_paint);
 }
@@ -1995,6 +2043,7 @@ struct win *fill_win(session_t *ps, struct win *w) {
 	    ps->atoms->a_NET_WM_NAME,        ps->atoms->aWM_CLASS,
 	    ps->atoms->aWM_WINDOW_ROLE,      ps->atoms->a_COMPTON_SHADOW,
 	    ps->atoms->aWM_CLIENT_LEADER,    ps->atoms->aWM_TRANSIENT_FOR,
+	    ps->atoms->a_NET_WM_STATE,
 	};
 	win_set_properties_stale(new, init_stale_props, ARR_SIZE(init_stale_props));
 
@@ -2024,7 +2073,7 @@ static inline void win_set_leader(session_t *ps, struct managed_win *w, xcb_wind
 		// Update the old and new window group and active_leader if the
 		// window could affect their state.
 		xcb_window_t cache_leader = win_get_leader(ps, w);
-		if (win_is_focused_raw(ps, w) && cache_leader_old != cache_leader) {
+		if (win_is_focused_raw(w) && cache_leader_old != cache_leader) {
 			ps->active_leader = cache_leader;
 
 			group_on_factor_change(ps, cache_leader_old);
@@ -2108,7 +2157,8 @@ bool win_update_class(session_t *ps, struct managed_win *w) {
 	w->class_general = NULL;
 
 	// Retrieve the property string list
-	if (!wid_get_text_prop(ps, w->client_win, ps->atoms->aWM_CLASS, &strlst, &nstr)) {
+	if (!wid_get_text_prop(&ps->c, ps->atoms, w->client_win, ps->atoms->aWM_CLASS,
+	                       &strlst, &nstr)) {
 		return false;
 	}
 
@@ -2137,7 +2187,7 @@ static void win_on_focus_change(session_t *ps, struct managed_win *w) {
 		xcb_window_t leader = win_get_leader(ps, w);
 
 		// If the window gets focused, replace the old active_leader
-		if (win_is_focused_raw(ps, w) && leader != ps->active_leader) {
+		if (win_is_focused_raw(w) && leader != ps->active_leader) {
 			xcb_window_t active_leader_old = ps->active_leader;
 
 			ps->active_leader = leader;
@@ -2146,7 +2196,7 @@ static void win_on_focus_change(session_t *ps, struct managed_win *w) {
 			group_on_factor_change(ps, leader);
 		}
 		// If the group get unfocused, remove it from active_leader
-		else if (!win_is_focused_raw(ps, w) && leader &&
+		else if (!win_is_focused_raw(w) && leader &&
 		         leader == ps->active_leader && !group_is_focused(ps, leader)) {
 			ps->active_leader = XCB_NONE;
 			group_on_factor_change(ps, leader);
@@ -2159,7 +2209,7 @@ static void win_on_focus_change(session_t *ps, struct managed_win *w) {
 #ifdef CONFIG_DBUS
 	// Send D-Bus signal
 	if (ps->o.dbus) {
-		if (win_is_focused_raw(ps, w)) {
+		if (win_is_focused_raw(w)) {
 			cdbus_ev_win_focusin(ps, &w->base);
 		} else {
 			cdbus_ev_win_focusout(ps, &w->base);
@@ -2177,15 +2227,18 @@ void win_set_focused(session_t *ps, struct managed_win *w) {
 		return;
 	}
 
-	if (win_is_focused_raw(ps, w)) {
+	if (w->is_ewmh_focused) {
+		assert(ps->active_win == w);
 		return;
 	}
 
 	auto old_active_win = ps->active_win;
 	ps->active_win = w;
-	assert(win_is_focused_raw(ps, w));
+	w->is_ewmh_focused = true;
 
 	if (old_active_win) {
+		assert(old_active_win->is_ewmh_focused);
+		old_active_win->is_ewmh_focused = false;
 		win_on_focus_change(ps, old_active_win);
 	}
 	win_on_focus_change(ps, w);
@@ -2258,7 +2311,7 @@ void win_update_bounding_shape(session_t *ps, struct managed_win *w) {
 
 		// Add border width because we are using a different origin.
 		// X thinks the top left of the inner window is the origin
-		// (for the bounding shape, althought xcb_get_geometry thinks
+		// (for the bounding shape, although xcb_get_geometry thinks
 		//  the outer top left (outer means outside of the window
 		//  border) is the origin),
 		// We think the top left of the border is the origin
@@ -2278,14 +2331,12 @@ void win_update_bounding_shape(session_t *ps, struct managed_win *w) {
 
 	// Window shape changed, we should free old wpaint and shadow pict
 	// log_trace("free out dated pict");
-	win_set_flags(w, WIN_FLAGS_IMAGES_STALE);
+	win_set_flags(w, WIN_FLAGS_IMAGES_STALE | WIN_FLAGS_FACTOR_CHANGED);
 	win_release_mask(ps->backend_data, w);
 	ps->pending_updates = true;
 
 	free_paint(ps, &w->paint);
 	free_paint(ps, &w->shadow_paint);
-
-	win_on_factor_change(ps, w);
 }
 
 /**
@@ -2601,7 +2652,7 @@ bool destroy_win_start(session_t *ps, struct win *w) {
 	HASH_DEL(ps->windows, w);
 
 	if (!w->managed || mw->state == WSTATE_UNMAPPED) {
-		// Window is already unmapped, or is an unmanged window, just
+		// Window is already unmapped, or is an unmanaged window, just
 		// destroy it
 		destroy_win_finish(ps, w);
 		return true;
@@ -3022,41 +3073,6 @@ struct managed_win *find_managed_window_or_parent(session_t *ps, xcb_window_t wi
 	return (struct managed_win *)w;
 }
 
-/**
- * Check if a rectangle includes the whole screen.
- */
-static inline bool rect_is_fullscreen(const session_t *ps, int x, int y, int wid, int hei) {
-	return (x <= 0 && y <= 0 && (x + wid) >= ps->root_width && (y + hei) >= ps->root_height);
-}
-
-/**
- * Check if a window is fulscreen using EWMH
- *
- * TODO(yshui) cache this property
- */
-static inline bool
-win_is_fullscreen_xcb(xcb_connection_t *c, const struct atom *a, const xcb_window_t w) {
-	xcb_get_property_cookie_t prop =
-	    xcb_get_property(c, 0, w, a->a_NET_WM_STATE, XCB_ATOM_ATOM, 0, 12);
-	xcb_get_property_reply_t *reply = xcb_get_property_reply(c, prop, NULL);
-	if (!reply) {
-		return false;
-	}
-
-	if (reply->length) {
-		xcb_atom_t *val = xcb_get_property_value(reply);
-		for (uint32_t i = 0; i < reply->length; i++) {
-			if (val[i] != a->a_NET_WM_STATE_FULLSCREEN) {
-				continue;
-			}
-			free(reply);
-			return true;
-		}
-	}
-	free(reply);
-	return false;
-}
-
 /// Set flags on a window. Some sanity checks are performed
 void win_set_flags(struct managed_win *w, uint64_t flags) {
 	log_debug("Set flags %" PRIu64 " to window %#010x (%s)", flags, w->base.id, w->name);
@@ -3141,13 +3157,15 @@ bool win_check_flags_all(struct managed_win *w, uint64_t flags) {
  *
  * It's not using w->border_size for performance measures.
  */
-bool win_is_fullscreen(const session_t *ps, const struct managed_win *w) {
-	if (!ps->o.no_ewmh_fullscreen &&
-	    win_is_fullscreen_xcb(ps->c.c, ps->atoms, w->client_win)) {
-		return true;
+void win_update_is_fullscreen(const session_t *ps, struct managed_win *w) {
+	if (!ps->o.no_ewmh_fullscreen && w->is_ewmh_fullscreen) {
+		w->is_fullscreen = true;
+		return;
 	}
-	return rect_is_fullscreen(ps, w->g.x, w->g.y, w->widthb, w->heightb) &&
-	       (!w->bounding_shaped || w->rounded_corners);
+	w->is_fullscreen = w->g.x <= 0 && w->g.y <= 0 &&
+	                   (w->g.x + w->widthb) >= ps->root_width &&
+	                   (w->g.y + w->heightb) >= ps->root_height &&
+	                   (!w->bounding_shaped || w->rounded_corners);
 }
 
 /**
@@ -3173,8 +3191,8 @@ bool win_is_bypassing_compositor(const session_t *ps, const struct managed_win *
  * Check if a window is focused, without using any focus rules or forced focus
  * settings
  */
-bool win_is_focused_raw(const session_t *ps, const struct managed_win *w) {
-	return w->a.map_state == XCB_MAP_STATE_VIEWABLE && ps->active_win == w;
+bool win_is_focused_raw(const struct managed_win *w) {
+	return w->a.map_state == XCB_MAP_STATE_VIEWABLE && w->is_ewmh_focused;
 }
 
 // Find the managed window immediately below `i` in the window stack
