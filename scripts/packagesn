@@ -1,0 +1,18 @@
+#!/bin/fish
+
+set updates (pacman -Q)
+set update_count 0
+
+
+for update in $updates
+    if string length -q $update >0
+        set update_count (math $update_count + 1)
+    end
+end
+echo "$update_count"
+
+if test $update_count -gt 50
+
+    notify-send " $update_count Updates are Available"
+
+end

@@ -1,0 +1,28 @@
+#!/bin/fish
+edex-ui &
+sleep 10
+tts "Welcome back..... sir. All systems are prepared. Arch Linux awaits."
+
+
+update_info = $(pacupdate)
+update_count = 0
+
+
+for update in $updates
+    if string length -q $update >0
+        set update_count (math $update_count + 1)
+    end
+end
+
+echo "$update_count"
+
+if [updates update_count -gt 50]
+    then
+
+
+    tts " $update_count Updates are Available"
+
+else
+
+    tts "No updates For today Sir."
+end
