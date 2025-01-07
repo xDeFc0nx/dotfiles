@@ -1,0 +1,16 @@
+#!/bin/bash
+
+text_to_speech() {
+  local text="$1"
+  local output_file="output_${text// /_}.mp3" # create a unique filename based on the input text
+  curl -X POST \
+    -H 'xi-api-key: (key here)' \
+    -H 'Content-Type: application/json' \
+    -d '{"model_id":"eleven_multilingual_v2","text":"'"$text"'","voice_settings":{"stability":1,"similarity_boost":0}}' \
+    'https://api.elevenlabs.io/v1/text-to-speech/6Zfuao4mt9ns6Ml9RfUa?optimize_streaming_latency=3&output_format=mp3_44100_32' \
+    -o "./output/$output_file"             # save the response to a file in the./output folder
+  mpg123 -a hw:0,3 "./output/$output_file" # play the saved MP3 file
+}
+
+text_to_speech "$1"
+
