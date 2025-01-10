@@ -16,6 +16,7 @@ set -x PATH $HOME/scripts $PATH
 ### EXPORT ###
 set fish_greeting # Supresses fish's intro message
 
+export XDG_CURRENT_DESKTOP=Hyprland
 set -x GPG_TTY (tty)
 
 ### SET MANPAGER
