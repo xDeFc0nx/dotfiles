@@ -13,6 +13,8 @@
 set -e fish_user_paths
 set -U fish_user_paths $HOME/.local/bin $HOME/Applications $fish_user_paths
 set -x PATH $HOME/scripts $PATH
+set -U fish_user_paths (go env GOPATH)/bin $fish_user_paths
+
 ### EXPORT ###
 set fish_greeting # Supresses fish's intro message
 

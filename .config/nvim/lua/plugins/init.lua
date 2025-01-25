@@ -114,4 +114,27 @@ return {
         }, -- table: additional groups that should be cleared
         exclude_groups = {}, -- table: groups you don't want to clear
     },
+    {
+        "Jezda1337/nvim-html-css",
+        opts = {
+            sources = {
+                {
+                    name = "html-css",
+                    option = {
+                        enable_on = { "html" }, -- html is enabled by default
+                        notify = false,
+                        documentation = {
+                            auto_show = true, -- show documentation on select
+                        },
+                        -- add any external scss like one below
+                        style_sheets = {
+                            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css",
+                            "https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css",
+                            "https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css", -- Tailwind CSS CDN
+                        },
+                    },
+                },
+            },
+        },
+    },
 }
