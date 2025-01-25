@@ -26,6 +26,21 @@ function trimTrackTitle(title) {
     return title;
 }
 
+function adjustVolume(direction) {
+    const step = 0.03; 
+    execAsync(['playerctl', 'volume'])
+        .then((output) => {
+            let currentVolume = parseFloat(output.trim());
+            let newVolume = direction === 'up' ? currentVolume + step : currentVolume - step;
+
+            if (newVolume > 1.0) newVolume = 1.0;
+            if (newVolume < 0.0) newVolume = 0.0;
+
+            execAsync(['playerctl', 'volume', newVolume.toFixed(2)]).catch(print);
+        })
+        .catch(print);
+}
+
 const BarGroup = ({ child }) => Box({
     className: 'bar-group-margin bar-sides',
     children: [
@@ -106,8 +121,7 @@ const switchToRelativeWorkspace = async (self, num) => {
 }
 
 export default () => {
-    // TODO: use cairo to make button bounce smaller on click, if that's possible
-    const playingState = Box({ // Wrap a box cuz overlay can't have margins itself
+    const playingState = Box({
         homogeneous: true,
         children: [Overlay({
             child: Box({
@@ -200,7 +214,7 @@ export default () => {
                         }),
                         setup: (self) => self.hook(Mpris, label => {
                             const mpris = Mpris.getPlayer('');
-                            //self.revealChild = (!mpris);
+                            self.revealChild = (!mpris);
                         }),
                     })
                 ],
@@ -208,8 +222,8 @@ export default () => {
         });
     }
     return EventBox({
-        onScrollUp: (self) => switchToRelativeWorkspace(self, -1),
-        onScrollDown: (self) => switchToRelativeWorkspace(self, +1),
+        onScrollUp: () => adjustVolume('up'),
+        onScrollDown: () => adjustVolume('down'),
         child: Box({
             className: 'spacing-h-4',
             children: [
@@ -220,11 +234,12 @@ export default () => {
                     onSecondaryClick: () => execAsync(['bash', '-c', 'playerctl next || playerctl position `bc <<< "100 * $(playerctl metadata mpris:length) / 1000000 / 100"` &']).catch(print),
                     onMiddleClick: () => execAsync('playerctl play-pause').catch(print),
                     setup: (self) => self.on('button-press-event', (self, event) => {
-                        if (event.get_button()[1] === 8) // Side button
-                            execAsync('playerctl previous').catch(print)
+                        if (event.get_button()[1] === 8) { // Side button
+                            execAsync('playerctl previous').catch(print);
+                        }
                     }),
-                })
-            ]
-        })
+                }),
+            ],
+        }),
     });
 }

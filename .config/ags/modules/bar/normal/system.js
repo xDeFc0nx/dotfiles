@@ -1,3 +1,4 @@
+// This is for the right pills of the bar.
 import Widget from 'resource:///com/github/Aylur/ags/widget.js';
 import * as Utils from 'resource:///com/github/Aylur/ags/utils.js';
 const { Box, Label, Button, Overlay, Revealer, Scrollable, Stack, EventBox } = Widget;
@@ -45,8 +46,7 @@ const codingTime = Variable('', {
 const BarWakapi = () => Box({
     className: 'spacing-h-4 bar-wakapi-time-box',
     children: [
-          MaterialIcon('code', 'norm', { tooltipText: "Coding Time" }), // Add icon here
-    
+        MaterialIcon('code', 'norm', { tooltipText: "Coding Time" }), // Add icon here
         Widget.Label({
             className: 'txt-smallie',
             label: codingTime.bind(), // Bind the coding time variable
@@ -65,10 +65,23 @@ const BarGroup = ({ child }) => Widget.Box({
     ]
 });
 
-// Bar section for battery progress
+// Battery progress section
+const BarBatteryProgress = () => {
+    const _updateProgress = (circprog) => { // Set circular progress value
+        circprog.css = `font-size: ${Math.abs(Battery.percent)}px;`
+        circprog.toggleClassName('bar-batt-circprog-low', Battery.percent <= userOptions.battery.low);
+        circprog.toggleClassName('bar-batt-circprog-full', Battery.charged);
+    }
+    return AnimatedCircProg({
+        className: 'bar-batt-circprog',
+        vpack: 'center', hpack: 'center',
+        extraSetup: (self) => self
+            .hook(Battery, _updateProgress)
+        ,
+    })
+}
 
-
-// Bar section for the clock
+// Clock section
 const time = Variable('', {
     poll: [
         userOptions.time.interval,
@@ -102,21 +115,39 @@ const BarClock = () => Widget.Box({
     ],
 });
 
-// Main widget for the bar, incorporating the Wakapi section and other components
-export default () => Widget.EventBox({
-    onScrollUp: (self) => switchToRelativeWorkspace(self, -1),
-    onScrollDown: (self) => switchToRelativeWorkspace(self, +1),
-    onPrimaryClick: () => App.toggleWindow('sideright'),
-    child: Widget.Box({
-        className: 'spacing-h-4',
-        children: [
-            BarGroup({ child: BarClock() }), // Add clock to the bar
-            BarGroup({ child: BarWakapi() }), // Add Wakapi coding stats to the bar
-        ]
-    })
-});
+// Utility buttons
+const UtilButton = ({ name, icon, onClicked }) => Button({
+    vpack: 'center',
+    tooltipText: name,
+    onClicked: onClicked,
+    className: 'bar-util-btn icon-material txt-norm',
+    label: `${icon}`,
+})
 
-// Battery section setup
+const Utilities = () => Box({
+    hpack: 'center',
+    className: 'spacing-h-4',
+    children: [
+        UtilButton({
+            name: getString('Screen snip'), icon: 'screenshot_region', onClicked: () => {
+                Utils.execAsync(`${App.configDir}/scripts/grimblast.sh copy area`)
+                    .catch(print)
+            }
+        }),
+        UtilButton({
+            name: getString('Color picker'), icon: 'colorize', onClicked: () => {
+                Utils.execAsync(['hyprpicker', '-a']).catch(print)
+            }
+        }),
+        UtilButton({
+            name: getString('Toggle on-screen keyboard'), icon: 'keyboard', onClicked: () => {
+                toggleWindowOnAllMonitors('osk');
+            }
+        }),
+    ]
+})
+
+// Battery section
 const BarBattery = () => Box({
     className: 'spacing-h-4 bar-batt-txt',
     children: [
@@ -155,40 +186,7 @@ const BarBattery = () => Box({
     ]
 });
 
-// Grouping the Bar section
-// Utility button setup
-const UtilButton = ({ name, icon, onClicked }) => Button({
-    vpack: 'center',
-    tooltipText: name,
-    onClicked: onClicked,
-    className: 'bar-util-btn icon-material txt-norm',
-    label: `${icon}`,
-});
-
-const Utilities = () => Box({
-    hpack: 'center',
-    className: 'spacing-h-4',
-    children: [
-        UtilButton({
-            name: getString('Screen snip'), icon: 'screenshot_region', onClicked: () => {
-                Utils.execAsync(`${App.configDir}/scripts/grimblast.sh copy area`)
-                    .catch(print)
-            }
-        }),
-        UtilButton({
-            name: getString('Color picker'), icon: 'colorize', onClicked: () => {
-                Utils.execAsync(['hyprpicker', '-a']).catch(print)
-            }
-        }),
-        UtilButton({
-            name: getString('Toggle on-screen keyboard'), icon: 'keyboard', onClicked: () => {
-                toggleWindowOnAllMonitors('osk');
-            }
-        }),
-    ]
-});
-
-// Battery module section setup
+// Battery module
 const BatteryModule = () => Stack({
     transition: 'slide_up_down',
     transitionDuration: userOptions.animations.durationLarge,
@@ -242,9 +240,49 @@ const BatteryModule = () => Stack({
                                 self.tooltipText = "Weather data unavailable";
                                 self.children[1].label = "Check internet connection";
                             }
-                        })
+                        });
+                    if (userOptions.weather.city != '' && userOptions.weather.city != null) {
+                        updateWeatherForCity(userOptions.weather.city.replace(/ /g, '%20'));
+                    }
+                    else {
+                        Utils.execAsync('curl ipinfo.io')
+                            .then(output => {
+                                return JSON.parse(output)['city'].toLowerCase();
+                            })
+                            .then(updateWeatherForCity)
+                            .catch(print)
+                    }
                 }),
             })
         }),
+    },
+    setup: (stack) => Utils.timeout(10, () => {
+        if (!Battery.available) stack.shown = 'desktop';
+        else stack.shown = 'laptop';
+    })
+})
+
+// Workspace switching
+const switchToRelativeWorkspace = async (self, num) => {
+    try {
+        const Hyprland = (await import('resource:///com/github/Aylur/ags/service/hyprland.js')).default;
+        Hyprland.messageAsync(`dispatch workspace ${num > 0 ? '+' : ''}${num}`).catch(print);
+    } catch {
+        execAsync([`${App.configDir}/scripts/sway/swayToRelativeWs.sh`, `${num}`]).catch(print);
     }
+}
+
+// Main widget
+export default () => Widget.EventBox({
+    onScrollUp: (self) => switchToRelativeWorkspace(self, -1),
+    onScrollDown: (self) => switchToRelativeWorkspace(self, +1),
+    onPrimaryClick: () => App.toggleWindow('sideright'),
+    child: Widget.Box({
+        className: 'spacing-h-4',
+        children: [
+            BarGroup({ child: BarClock() }),
+            BarGroup({ child: BarWakapi() }), // Add Wakapi section
+            BatteryModule(),
+        ]
+    })
 });

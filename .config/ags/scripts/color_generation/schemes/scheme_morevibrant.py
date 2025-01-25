@@ -1,6 +1,9 @@
-from materialyoucolor.scheme.dynamic_scheme import DynamicSchemeOptions, DynamicScheme
-from materialyoucolor.scheme.variant import Variant
 from materialyoucolor.palettes.tonal_palette import TonalPalette
+from materialyoucolor.scheme.dynamic_scheme import (
+    DynamicScheme,
+    DynamicSchemeOptions,
+)
+from materialyoucolor.scheme.variant import Variant
 
 
 class SchemeMoreVibrant(DynamicScheme):
@@ -11,7 +14,7 @@ class SchemeMoreVibrant(DynamicScheme):
     def __init__(self, source_color_hct, is_dark, contrast_level):
         super().__init__(
             DynamicSchemeOptions(
-                source_color_argb=source_color_hct.to_int(),
+                source_color_hct=source_color_hct,
                 variant=Variant.VIBRANT,
                 contrast_level=contrast_level,
                 is_dark=is_dark,
