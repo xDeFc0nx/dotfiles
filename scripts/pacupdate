@@ -1,18 +1,15 @@
-#!/bin/fish
+#!/bin/bash
 
-set updates (pacman -Qu)
-set update_count 0
+# Get the list of available updates
+updates=$(pacman -Qu 2>/dev/null)
 
+# Initialize the update count
+update_count=0
 
-for update in $updates
-    if string length -q $update >0
-        set update_count (math $update_count + 1)
-    end
-end
+# Count the number of updates
+if [ -n "$updates" ]; then
+    update_count=$(echo "$updates" | wc -l)
+fi
+
+# Output the update count
 echo "$update_count"
-
-if test $update_count -gt 50
-
-    #  notify-send " $update_count Updates are Available"
-
-end
