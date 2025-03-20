@@ -1,0 +1,5 @@
+#!/bin/bash
+
+ ~/projects/llama.cpp/build/bin/llama-cli -m ~/Downloads/DeepSeek-R1-Distill-Llama-8B-Q3_K_M.gguf -p "You are an assistant on a arch linux computer your owner is nehar he asked:" -t 4 \-c 2048 -c 512 -b 1024 -n 256 --keep 48 \
+    --repeat_penalty 1.0 --color -i 
+

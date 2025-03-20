@@ -17,9 +17,9 @@ const fetchWakapiCodingTime = async () => {
     try {
         const response = await execAsync([
             'curl', '-X', 'GET',
-            'https://wakapi.prodg.xyz/api/users/DeFc0n/statusbar/today',
+            'http://localhost:3131/api/users/defc0n/statusbar/today',
             '-H', 'accept: application/json',
-            '-H', 'Authorization:  Basic MmFiYjE1NjItYmVhZi00Zjk3LTllYjMtNWUyMWEzYWMyNDM2'
+            '-H', 'Authorization:  Basic MTFhZGZmMWItNTIyNC00YTg4LTk2NDMtMDU1M2Y4YjQ0YWYw'
         ]);
         
         const data = JSON.parse(response);

@@ -13,6 +13,7 @@
 set -e fish_user_paths
 set -U fish_user_paths $HOME/.local/bin $HOME/Applications $fish_user_paths
 set -x PATH $HOME/scripts $PATH
+set -x PATH $HOME/scripts/* $PATH
 set -U fish_user_paths (go env GOPATH)/bin $fish_user_paths
 
 ### EXPORT ###
@@ -342,6 +343,6 @@ end
 alias pamcan=pacman
 
 # function fish_prompt
-#   set_color cyan; echo (pwd)
-#   set_color green; echo '> '
-# endc.js
+ #  set_color cyan; echo (pwd)
+ #  set_color green; echo '> '
+ #endc.js

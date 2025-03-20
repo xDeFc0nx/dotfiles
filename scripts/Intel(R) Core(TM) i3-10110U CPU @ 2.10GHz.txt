@@ -1,0 +1,3 @@
+
+prompt eval rate:     5.93 tokens/s
+eval rate:            3.90 tokens/s
