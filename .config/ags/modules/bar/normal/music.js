@@ -37,21 +37,13 @@ const BarGroup = ({ child }) => Box({
     className: 'bar-group-margin bar-sides',
     children: [
         Box({
-            className: 'bar-group bar-group-standalone bar-group-pad-system',
+            className: `bar-group${userOptions.appearance.borderless ? '-borderless' : ''} bar-group-standalone bar-group-pad-system`,
             children: [child],
         }),
     ]
 });
 
-const BarResource = (
-    name,
-    icon,
-    command,
-    circprogClassName = 'bar-batt-circprog',
-    textClassName = 'txt-onSurfaceVariant',
-    iconClassName = 'bar-batt',
-    isRawNumber = false
-) => {
+const BarResource = (name, icon, command, circprogClassName = `bar-batt-circprog ${userOptions.appearance.borderless ? 'bar-batt-circprog-borderless' : ''}`, textClassName = 'txt-onSurfaceVariant', iconClassName = 'bar-batt') => {
     const resourceCircProg = AnimatedCircProg({
         className: circprogClassName,
         vpack: 'center',
@@ -96,13 +88,14 @@ const BarResource = (
 const TrackProgress = () => {
     const _updateProgress = (circprog) => {
         const mpris = Mpris.getPlayer('');
-        if (!mpris) return;
-        circprog.css = `font-size: ${Math.max(mpris.position / mpris.length * 100, 0)}px;`;
-    };
+        if (!mpris)
+            circprog.css = `font-size: ${userOptions.appearance.borderless ? 100 : 0}px;`
+        else // Set circular progress value
+            circprog.css = `font-size: ${Math.max(mpris.position / mpris.length * 100, 0)}px;`
+    }
     return AnimatedCircProg({
-        className: 'bar-music-circprog',
-        vpack: 'center',
-        hpack: 'center',
+        className: `bar-music-circprog ${userOptions.appearance.borderless ? 'bar-music-circprog-borderless' : ''}`,
+        vpack: 'center', hpack: 'center',
         extraSetup: (self) => self
             .hook(Mpris, _updateProgress)
             .poll(3000, _updateProgress)
