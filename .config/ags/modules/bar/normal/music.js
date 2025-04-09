@@ -166,34 +166,37 @@ export default () => {
                     onScrollDown: () => execAsync(CUSTOM_MODULE_SCROLLDOWN_SCRIPT).catch(print),
                 })
             });
-        } else {
-            return BarGroup({
-                child: Box({
-                    children: [
-                        BarResource(getString('RAM Usage'), 'memory', 'LANG=C free | awk \'/^Mem/ {printf("%.2f\\n", ($3/$2) * 100)}\'',
-                            'bar-ram-circprog', 'bar-ram-txt', 'bar-ram-icon'),
-                        Revealer({
-                            revealChild: true,
-                            transition: 'slide_left',
-                            transitionDuration: userOptions.animations.durationLarge,
-                            child: Box({
-                                className: 'spacing-h-10 margin-left-10',
-                                children: [
-                                    BarResource(getString('Swap Usage'), 'swap_horiz', 'LANG=C free | awk \'/^Swap/ {if ($2 > 0) printf("%.2f\\n", ($3/$2) * 100); else print "0";}\'',
-                                        'bar-swap-circprog', 'bar-swap-txt', 'bar-swap-icon'),
-                                    BarResource(getString('CPU Usage'), 'settings_motion_mode', 'LANG=C top -bn1 | grep Cpu | sed \'s/,/./g\' | awk \'{print $2}\'',
-                                        'bar-cpu-circprog', 'bar-cpu-txt', 'bar-cpu-icon'),
-                                    BarResource(getString('Updates'), 'settings_motion_mode', '(pacupdate 2>/dev/null || echo 0) | head -n1',
-                                         'bar-cpu-circprog', 'bar-cpu-txt', 'bar-cpu-icon', true),                                ]
-                            })
-                        })
-                    ]
-                })
-            });
-        }
-    };
-
-    return EventBox({
+        } else return BarGroup({ // Kept concise return from bottom
+            child: Box({
+                children: [
+                    // Kept RAM resource styling/command format from bottom
+                    BarResource(getString('RAM Usage'), 'memory', `LANG=C free | awk '/^Mem/ {printf("%.2f\\n", ($3/$2) * 100)}'`,
+                        `bar-ram-circprog ${userOptions.appearance.borderless ? 'bar-ram-circprog-borderless' : ''}`, 'bar-ram-txt', 'bar-ram-icon'),
+                    Revealer({ // Kept Revealer logic from bottom
+                        revealChild: true,
+                        transition: 'slide_left',
+                        transitionDuration: userOptions.animations.durationLarge,
+                        child: Box({
+                            className: 'spacing-h-10 margin-left-10',
+                            children: [
+                                BarResource(getString('Swap Usage'), 'swap_horiz', `LANG=C free | awk '/^Swap/ {if ($2 > 0) printf("%.2f\\n", ($3/$2) * 100); else print "0";}'`,
+                                    `bar-swap-circprog ${userOptions.appearance.borderless ? 'bar-swap-circprog-borderless' : ''}`, 'bar-swap-txt', 'bar-swap-icon'),
+                                BarResource(getString('CPU Usage'), 'settings_motion_mode', `LANG=C top -bn1 | grep Cpu | sed 's/\\,/\\./g' | awk '{print $2}'`,
+                                    `bar-cpu-circprog ${userOptions.appearance.borderless ? 'bar-cpu-circprog-borderless' : ''}`, 'bar-cpu-txt', 'bar-cpu-icon'),
+                                BarResource(getString('Updates'), 'download', `(pacupdate 2>/dev/null || paru -Qua 2>/dev/null || yay -Qua 2>/dev/null || echo 0) | wc -l`,
+                                     `bar-updates-circprog ${userOptions.appearance.borderless ? 'bar-updates-circprog-borderless' : ''}`, 'bar-updates-txt', 'bar-updates-icon', true), // Kept the 'true' flag from HEAD, changed icon/classes for clarity
+                            ]
+                        }),
+                        setup: (self) => self.hook(Mpris, label => {
+                            const mpris = Mpris.getPlayer('');
+                            self.revealChild = (!mpris || userOptions.bar.alwaysShowFullResources);
+                        }),
+                    })
+                ],
+            })
+        });
+    }  
+  return EventBox({
         onScrollUp: () => adjustVolume('up'),
         onScrollDown: () => adjustVolume('down'),
         child: Box({
