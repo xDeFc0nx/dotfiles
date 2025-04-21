@@ -20,7 +20,7 @@ const fetchWakapiCodingTime = async () => {
             'curl', '-X', 'GET',
             'http://localhost:3131/api/users/defc0n/statusbar/today',
             '-H', 'accept: application/json',
-            '-H', 'Authorization:  Basic' 
+            '-H', 'Authorization:  Basic MTFhZGZmMWItNTIyNC00YTg4LTk2NDMtMDU1M2Y4YjQ0YWYw' 
         ]);
         
         const data = JSON.parse(response);
@@ -56,14 +56,35 @@ const BarWakapi = () => Box({
 });
 // Bar group to hold Wakapi time in the bar
 
-const BarGroup = ({ child }) => Widget.Box({
+const UPDATE_CMD = 'pacupdate';
+const updateCount = Variable("?");
+
+// Widget to display the update count and icon
+const BarUpdates = () => Box({
+    className: 'spacing-h-4 bar-updates-box',
+    tooltipText: updateCount.bind().transform(v => `${v} updates available`), // Tooltip showing count
+    children: [
+        MaterialIcon('system_update', 'norm'), // Icon for updates
+        Label({
+            className: 'txt-smallie',
+            label: updateCount.bind(),
+        }),
+    ],
+    // Show only if the command execution didn't result in an empty string or "?" placeholder
+    // Adjust this visibility logic if pacupdate might output non-numeric things on error
+    visible: updateCount.bind().transform(v => v !== "?" && v.trim() !== ""),
+});
+
+const BarGroup = ({ child, ...rest }) => Widget.Box({ // Allow passing props
+    ...rest, // Spread additional props
     className: 'bar-group-margin bar-sides',
     children: [
         Widget.Box({
-            className: `bar-group${userOptions.appearance.borderless ? '-borderless' : ''} bar-group-standalone bar-group-pad-system`,
+            // Check for child existence before accessing properties
+            className: `bar-group ${userOptions.appearance.borderless ? 'bar-group-borderless' : ''} bar-group-standalone ${child?.className?.includes('bar-updates-box') ? 'bar-group-pad-updates' : 'bar-group-pad-system'}`,
             children: [child],
         }),
-    ]
+    ],
 });
 // Battery progress section
 const BarBatteryProgress = () => {
@@ -282,6 +303,7 @@ export default () => Widget.EventBox({
         children: [
             BarGroup({ child: BarClock() }),
             BarGroup({ child: BarWakapi() }), // Add Wakapi section
+           BarGroup({ child: BarUpdates() }),
             BatteryModule(),
         ]
     })

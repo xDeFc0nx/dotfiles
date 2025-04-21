@@ -183,9 +183,7 @@ export default () => {
                                     `bar-swap-circprog ${userOptions.appearance.borderless ? 'bar-swap-circprog-borderless' : ''}`, 'bar-swap-txt', 'bar-swap-icon'),
                                 BarResource(getString('CPU Usage'), 'settings_motion_mode', `LANG=C top -bn1 | grep Cpu | sed 's/\\,/\\./g' | awk '{print $2}'`,
                                     `bar-cpu-circprog ${userOptions.appearance.borderless ? 'bar-cpu-circprog-borderless' : ''}`, 'bar-cpu-txt', 'bar-cpu-icon'),
-                                BarResource(getString('Updates'), 'download', `(pacupdate 2>/dev/null || paru -Qua 2>/dev/null || yay -Qua 2>/dev/null || echo 0) | wc -l`,
-                                     `bar-updates-circprog ${userOptions.appearance.borderless ? 'bar-updates-circprog-borderless' : ''}`, 'bar-updates-txt', 'bar-updates-icon', true), // Kept the 'true' flag from HEAD, changed icon/classes for clarity
-                            ]
+                              ]
                         }),
                         setup: (self) => self.hook(Mpris, label => {
                             const mpris = Mpris.getPlayer('');
