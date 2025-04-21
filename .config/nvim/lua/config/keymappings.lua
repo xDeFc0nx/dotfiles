@@ -105,3 +105,5 @@ end)
 -- Adjust font size
 keymap("n", "<M-=>", function() require('utils').adjust_font_size(1) end, silent)
 keymap("n", "<M-->", function() require('utils').adjust_font_size(-1) end, silent)
+
+
