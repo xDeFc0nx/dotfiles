@@ -206,6 +206,7 @@ alias vpn='sudo openvpn --config pc.ovpn'
 # root privileges
 alias doas="doas --"
 alias edit-fish='vim ~/.config/fish/config.fish'
+alias edit-vim='vim ~/.config/nvim/'
 alias play='aplay -q'
 alias config='/usr/bin/git --git-dir=$HOME/dotfiles --work-tree=$HOME'
 alias docker="sudo docker"
@@ -341,7 +342,7 @@ if test -f ~/.cache/ags/user/generated/terminal/sequences.txt
 end
 
 alias pamcan=pacman
-
+source ~/.config/fish/auto-Hypr.fish
 # function fish_prompt
  #  set_color cyan; echo (pwd)
  #  set_color green; echo '> '
