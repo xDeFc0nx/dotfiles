@@ -53,6 +53,7 @@ Singleton {
     property string userAvatarPathRicersAndWeirdSystems2: FileUtils.trimFileProtocol(`${Directories.home}.face.icon`)
     // Cleanup on init
     Component.onCompleted: {
+        Quickshell.execDetached(["mkdir", "-p", `${shellConfig}/translations`])
         Quickshell.execDetached(["mkdir", "-p", `${shellConfig}`])
         Quickshell.execDetached(["mkdir", "-p", `${favicons}`])
         Quickshell.execDetached(["bash", "-c", `rm -rf '${coverArt}'; mkdir -p '${coverArt}'`])

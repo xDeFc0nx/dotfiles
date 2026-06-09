@@ -25,8 +25,8 @@ ShellRoot {
     Component.onCompleted: {
         MaterialThemeLoader.reapplyTheme()
         Hyprsunset.load()
-        FirstRunExperience.load()
-        ConflictKiller.load()
+       FirstRunExperience.load()
+       ConflictKiller.load()
         Cliphist.refresh()
         Wallpapers.load()
         Updates.load()
@@ -34,7 +34,7 @@ ShellRoot {
 
 
     // Panel families
-    property list<string> families: ["ii", "waffle"]
+    property list<string> families: ["ii", "waffle", "island"]
     function cyclePanelFamily() {
         const currentIndex = families.indexOf(Config.options.panelFamily)
         const nextIndex = (currentIndex + 1) % families.length
@@ -57,6 +57,10 @@ ShellRoot {
         component: WaffleFamily {}
     }
 
+    PanelFamilyLoader {
+        identifier: "island"
+        component: IslandFamily{}
+    }
 
     // Shortcuts
     IpcHandler {

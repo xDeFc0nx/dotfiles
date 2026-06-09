@@ -15,7 +15,7 @@ Singleton {
     id: root
 
     property bool wifi: true
-    property bool ethernet: false
+    property bool isEthernet: false
 
     property bool wifiEnabled: false
     property bool wifiScanning: false
@@ -34,7 +34,7 @@ Singleton {
 
     property string networkName: ""
     property int networkStrength
-    property string materialSymbol: root.ethernet
+    property string materialSymbol: root.isEthernet
         ? "lan"
         : (root.wifiEnabled && root.wifiStatus === "connected")
             ? (
@@ -180,17 +180,19 @@ Singleton {
         }
         stdout: SplitParser {
             onRead: data => {
-                updateConnectionType.buffer += data + "\n";
+                updateConnectionType.buffer += data + "
+";
             }
         }
         onExited: (exitCode, exitStatus) => {
-            const lines = updateConnectionType.buffer.trim().split('\n');
+            const lines = updateConnectionType.buffer.trim().split('
+');
             const connectivity = lines.pop() // none, limited, full
             let hasEthernet = false;
             let hasWifi = false;
             let wifiStatus = "disconnected";
             lines.forEach(line => {
-                if (line.includes("ethernet") && line.includes("connected"))
+                if (line.includes("ethernet") && (line.includes("connected") || line.includes("unmanaged")))
                     hasEthernet = true;
                 else if (line.includes("wifi:")) {
                     if (line.includes("disconnected")) {
@@ -214,7 +216,7 @@ Singleton {
                 }
             });
             root.wifiStatus = wifiStatus;
-            root.ethernet = hasEthernet;
+            root.isEthernet = hasEthernet;
             root.wifi = hasWifi;
         }
     }
@@ -233,7 +235,7 @@ Singleton {
     Process {
         id: updateNetworkStrength
         running: true
-        command: ["sh", "-c", "nmcli -f IN-USE,SIGNAL,SSID device wifi | awk '/^\\*/{if (NR!=1) {print $2}}'"]
+        command: ["sh", "-c", "nmcli -f IN-USE,SIGNAL,SSID device wifi | awk '/^\*/{if (NR!=1) {print $2}}'"]
         stdout: SplitParser {
             onRead: data => {
                 root.networkStrength = parseInt(data);
@@ -267,10 +269,11 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 const PLACEHOLDER = "STRINGWHICHHOPEFULLYWONTBEUSED";
-                const rep = new RegExp("\\\\:", "g");
+                const rep = new RegExp("\:", "g");
                 const rep2 = new RegExp(PLACEHOLDER, "g");
 
-                const allNetworks = text.trim().split("\n").map(n => {
+                const allNetworks = text.trim().split("
+").map(n => {
                     const net = n.replace(rep, PLACEHOLDER).split(":");
                     return {
                         active: net[0] === "yes",

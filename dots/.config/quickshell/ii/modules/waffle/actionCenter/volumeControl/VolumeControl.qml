@@ -13,68 +13,34 @@ import qs.modules.waffle.actionCenter
 Item {
     id: root
     property bool output: true
+    property string title: "Audio"
 
-    WPanelPageColumn {
+    ColumnLayout {
         anchors.fill: parent
+        spacing: 4
 
-        BodyRectangle {
-            implicitHeight: 400
-            implicitWidth: 50
+        StyledFlickable {
+            id: flickable
+            Layout.fillHeight: true
+            Layout.fillWidth: true
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 4
-                spacing: 4
+            contentHeight: contentLayout.implicitHeight
+            contentWidth: width
+            clip: true
 
-                HeaderRow {
-                    Layout.fillWidth: true
-                    title: root.output ? Translation.tr("Sound output") : Translation.tr("Sound input")
-                }
-
-                StyledFlickable {
-                    id: flickable
-                    Layout.fillHeight: true
-                    Layout.fillWidth: true
-
-                    contentHeight: contentLayout.implicitHeight
-                    contentWidth: width
-                    clip: true
-
-                    AudioChoices {
-                        id: contentLayout
-                        width: flickable.width
-                    }
-                }
+            AudioChoices {
+                id: contentLayout
+                width: flickable.width
             }
         }
 
-        WPanelSeparator {}
-
-        FooterRectangle {
-            WButton {
-                id: moreSettingsButton
-                anchors {
-                    verticalCenter: parent.verticalCenter
-                    left: parent.left
-                }
-                implicitHeight: 40
-                implicitWidth: contentItem.implicitWidth + 30
-                color: "transparent"
-
+        RowLayout {
+            Layout.fillWidth: true
+            WTextButton {
+                text: Translation.tr("More volume settings")
                 onClicked: {
                     Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "sidebarLeft", "toggle"]);
                     Quickshell.execDetached(["bash", "-c", Config.options.apps.volumeMixer]);
-                }
-
-                contentItem: Item {
-                    anchors.centerIn: parent
-                    implicitWidth: buttonText.implicitWidth
-                    WText {
-                        id: buttonText
-                        anchors.centerIn: parent
-                        text: Translation.tr("More volume settings")
-                        color: moreSettingsButton.pressed ? Looks.colors.fg : Looks.colors.fg1
-                    }
                 }
             }
         }
@@ -108,8 +74,6 @@ Item {
             color: Looks.colors.bg2Hover
         }
 
-        ////////////////////////////////////////////////////////////
-
         SectionText {
             visible: EasyEffects.available && root.output
             text: Translation.tr("Sound effects")
@@ -132,8 +96,6 @@ Item {
         WPanelSeparator {
             color: Looks.colors.bg2Hover
         }
-
-        ////////////////////////////////////////////////////////////
 
         SectionText {
             visible: EasyEffects.available
