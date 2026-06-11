@@ -15,8 +15,8 @@ import qs.modules.waffle.actionCenter.volumeControl
 
 Item {
     id: root
-    width: parent ? parent.width : 0
-    height: parent ? parent.height : 0
+    implicitWidth: 420
+    implicitHeight: header.height + stack.implicitHeight + 44
     
     property var islandWindow: null
 
@@ -225,12 +225,13 @@ Item {
             top: header.bottom
             left: parent.left
             right: parent.right
-            bottom: parent.bottom
             topMargin: 12
             leftMargin: 24
             rightMargin: 24
-            bottomMargin: 16
         }
+        
+        implicitHeight: currentItem ? currentItem.implicitHeight : 0
+        height: implicitHeight
         initialItem: mainView
     }
 
@@ -238,7 +239,9 @@ Item {
         id: wifiView
         WifiControl {
             readonly property string title: "Wi-Fi"
-            anchors.fill: parent
+            width: stack.width
+            implicitHeight: 450 
+            height: implicitHeight
         }
     }
 
@@ -246,7 +249,9 @@ Item {
         id: audioView
         VolumeControl {
             readonly property string title: "Audio"
-            anchors.fill: parent
+            width: stack.width
+            implicitHeight: 400 
+            height: implicitHeight
         }
     }
 
@@ -265,7 +270,8 @@ Item {
                     subtext: Network.wifiEnabled ? (Network.wifiStatus === "connected" ? Network.networkName : Network.wifiStatus) : "Disabled"
                     active: Network.wifiEnabled
                     iconSource: "../../assets/icons/fluent/wifi-4-filled.svg"
-                    Layout.preferredWidth: parent.width * 0.4
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 40
                     onClickedCallback: () => Network.toggleWifi()
                     onRightClickedCallback: () => stack.push(wifiView)
                 }
@@ -275,7 +281,8 @@ Item {
                     subtext: Audio.sink ? Audio.friendlyDeviceName(Audio.sink) : "No device"
                     active: !Audio.sink?.audio?.muted
                     iconSource: "../../assets/icons/fluent/speaker-2-filled.svg"
-                    Layout.preferredWidth: parent.width * 0.6
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 60
                     onClickedCallback: () => Audio.toggleMute()
                     onRightClickedCallback: () => stack.push(audioView)
                 }
@@ -516,7 +523,6 @@ Item {
 
             ColumnLayout {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
                 spacing: 8
                 
                 RowLayout {
@@ -547,12 +553,14 @@ Item {
                 }
                 
                 ScrollView {
+                    id: notifScroll
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
                     clip: true
+                    implicitHeight: Math.min(220, notifList.implicitHeight)
                     
                     ColumnLayout {
-                        width: parent.width
+                        id: notifList
+                        width: notifScroll.width
                         spacing: 8
                         
                         Repeater {

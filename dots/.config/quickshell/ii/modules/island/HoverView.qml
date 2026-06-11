@@ -9,48 +9,18 @@ Item {
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
 
-    function getNextPrayer() {
-        var now = new Date();
-        var timings = PrayerTimes.timings;
-        if (!timings || Object.keys(timings).length === 0) return Translation.tr("Prayers...");
+    
+    property var currentDateTime: new Date()
 
-        var mainPrayers = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
-        var minDiff = 86400000;
-        var prayerName = "";
+    
+    readonly property bool isFullyExpanded: width >= 400
 
-        for (var i = 0; i < mainPrayers.length; i++) {
-            var p = mainPrayers[i];
-            if (!timings[p]) continue;
-
-            var timeParts = timings[p].split(":");
-            var prayerTime = new Date();
-            prayerTime.setHours(timeParts[0]);
-            prayerTime.setMinutes(timeParts[1]);
-            prayerTime.setSeconds(0);
-
-            var diff = prayerTime - now;
-            if (diff > 0 && diff < minDiff) {
-                minDiff = diff;
-                prayerName = p;
-            }
-        }
-
-        // Fallback to tomorrow's Fajr if Isha passed
-        if (prayerName === "" && timings["Fajr"]) {
-            var timeParts = timings["Fajr"].split(":");
-            var prayerTime = new Date();
-            prayerTime.setDate(prayerTime.getDate() + 1);
-            prayerTime.setHours(timeParts[0]);
-            prayerTime.setMinutes(timeParts[1]);
-            prayerTime.setSeconds(0);
-            minDiff = prayerTime - now;
-            prayerName = "Fajr";
-        }
-
-        var totalMins = Math.floor(minDiff / 60000);
-        var h = Math.floor(totalMins / 60);
-        var m = totalMins % 60;
-        return (prayerName || "Prayers") + " in " + (h > 0 ? h + "H " : "") + m + "M";
+    Timer {
+        id: clockUpdateTimer
+        interval: 1000 
+        running: true
+        repeat: true
+        onTriggered: root.currentDateTime = new Date()
     }
 
     component StatusPill : Rectangle {
@@ -60,9 +30,24 @@ Item {
         height: 32
         width: pillRow.implicitWidth + 24
         
-        color: Appearance.colors.colLayer1
+        
+        color: {
+            if (!Appearance.colors || !Appearance.colors.colLayer0)
+                return Qt.rgba(0, 0, 0, 0.25);
+            var isDark = Appearance.colors.colLayer0.hslLightness < 0.5;
+            return isDark ? Qt.rgba(0, 0, 0, 0.25) : Qt.rgba(255, 255, 255, 0.35);
+        }
+
         border.width: 1
-        border.color: Appearance.colors.colLayer1 
+
+        
+        border.color: {
+            if (!Appearance.colors || !Appearance.colors.colLayer0)
+                return Qt.rgba(255, 255, 255, 0.05);
+            var isDark = Appearance.colors.colLayer0.hslLightness < 0.5;
+            return isDark ? Qt.rgba(255, 255, 255, 0.06) : Qt.rgba(0, 0, 0, 0.08);
+        }
+
         radius: 16
 
         MouseArea {
@@ -151,7 +136,7 @@ Item {
                 }
             }
 
-            // Weather addition
+            
             Row {
                 spacing: 4
                 Text {
@@ -182,19 +167,60 @@ Item {
         }
     }
 
+    
     RowLayout {
-        anchors.fill: parent
+        anchors.left: parent.left
         anchors.leftMargin: 24
-        anchors.rightMargin: 160
-        spacing: 20
+        anchors.verticalCenter: parent.verticalCenter
+        width: parent.width / 2 - 80 
+        spacing: 8
+        clip: true
+
+        
+        opacity: root.isFullyExpanded ? 1.0 : 0.0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 100 } }
+
+        
+        Item {
+            Layout.preferredWidth: 16
+            Layout.preferredHeight: 16
+            Layout.alignment: Qt.AlignVCenter
+
+            Image {
+                id: sunPositionImg
+                source: {
+                    var name = PrayerTimes.nextPrayerStr.split(" ")[0]; 
+                    switch (name) {
+                        case "Fajr":
+                        case "Dhuhr":
+                        case "Asr":
+                            return "../../assets/icons/fluent/weather-sunny-filled.svg"; 
+                        case "Maghrib":
+                        case "Isha":
+                            return "../../assets/icons/fluent/weather-moon-filled.svg";  
+                        default:
+                            return "../../assets/icons/fluent/weather-sunny-filled.svg";
+                    }
+                }
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectFit
+                opacity: 0.0
+            }
+
+            ColorOverlay {
+                anchors.fill: sunPositionImg
+                source: sunPositionImg
+                color: Appearance.colors.colOnLayer0
+            }
+        }
 
         ColumnLayout {
             spacing: 0
-            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
             Layout.fillWidth: true
 
             Text {
-                text: getNextPrayer()
+                text: PrayerTimes.nextPrayerStr 
                 color: Appearance.colors.colOnLayer0
                 font.family: Appearance.fontFamily || "sans-serif"
                 font.pixelSize: 14
@@ -209,34 +235,38 @@ Item {
                 elide: Text.ElideRight
             }
         }
-
-        ColumnLayout {
-            Layout.preferredWidth: 120
-            Layout.alignment: Qt.AlignCenter
-            spacing: 2
-
-            Text {
-                text: Qt.formatTime(new Date(), "HH:mm")
-                color: Appearance.colors.colOnLayer0
-                font.family: Appearance.fontFamily || "sans-serif"
-                font.pixelSize: 24
-                font.bold: true
-                Layout.alignment: Qt.AlignCenter
-            }
-            Text {
-                text: Qt.formatDate(new Date(), "ddd, MMM d")
-                color: Appearance.colors.colOnSurfaceVariant
-                font.pixelSize: 12
-                Layout.alignment: Qt.AlignCenter
-            }
-        }
-        
-        Item { Layout.fillWidth: true }
     }
 
+    
+    ColumnLayout {
+        anchors.centerIn: parent
+        spacing: 2
+
+        Text {
+            text: Qt.formatTime(root.currentDateTime, "HH:mm")
+            color: Appearance.colors.colOnLayer0
+            font.family: Appearance.fontFamily || "sans-serif"
+            font.pixelSize: 24
+            font.bold: true
+            Layout.alignment: Qt.AlignCenter
+        }
+        Text {
+            text: Qt.formatDate(root.currentDateTime, "ddd, MMM d")
+            color: Appearance.colors.colOnSurfaceVariant
+            font.pixelSize: 12
+            Layout.alignment: Qt.AlignCenter
+        }
+    }
+
+    
     StatusPill {
         anchors.right: parent.right
         anchors.rightMargin: 24
         anchors.verticalCenter: parent.verticalCenter
+
+        
+        opacity: root.isFullyExpanded ? 1.0 : 0.0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 100 } }
     }
 }
