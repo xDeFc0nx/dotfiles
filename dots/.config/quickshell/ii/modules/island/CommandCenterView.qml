@@ -70,7 +70,16 @@ Item {
                 ColorOverlay {
                     anchors.fill: btnIcon
                     source: btnIcon
-                    color: btn.active ? "#0f1f1a" : Appearance.colors.colOnLayer0
+                    color: {
+                        if (btn.active) {
+                            if (Appearance.colors && Appearance.colors.colOnPrimary)
+                                return Appearance.colors.colOnPrimary;
+                            var p = Appearance.colors.colPrimary;
+                            var l = (0.299 * p.r + 0.587 * p.g + 0.114 * p.b);
+                            return l > 0.5 ? "#1a120b" : "#ffffff";
+                        }
+                        return Appearance.colors.colOnLayer0;
+                    }
                 }
             }
             
@@ -80,7 +89,16 @@ Item {
                 
                 Text {
                     text: btn.title
-                    color: btn.active ? "#0f1f1a" : Appearance.colors.colOnLayer0
+                    color: {
+                        if (btn.active) {
+                            if (Appearance.colors && Appearance.colors.colOnPrimary)
+                                return Appearance.colors.colOnPrimary;
+                            var p = Appearance.colors.colPrimary;
+                            var l = (0.299 * p.r + 0.587 * p.g + 0.114 * p.b);
+                            return l > 0.5 ? "#1a120b" : "#ffffff";
+                        }
+                        return Appearance.colors.colOnLayer0;
+                    }
                     font.family: Appearance.fontFamily || "sans-serif"
                     font.pixelSize: 12
                     font.bold: true
@@ -88,7 +106,16 @@ Item {
                 }
                 Text {
                     text: btn.subtext
-                    color: btn.active ? Qt.rgba(15,31,26,0.7) : Appearance.colors.colOnSurfaceVariant
+                    color: {
+                        if (btn.active) {
+                            if (Appearance.colors && Appearance.colors.colOnPrimary)
+                                return Qt.rgba(Appearance.colors.colOnPrimary.r, Appearance.colors.colOnPrimary.g, Appearance.colors.colOnPrimary.b, 0.7);
+                            var p = Appearance.colors.colPrimary;
+                            var l = (0.299 * p.r + 0.587 * p.g + 0.114 * p.b);
+                            return l > 0.5 ? "rgba(26, 18, 11, 0.7)" : "rgba(255, 255, 255, 0.7)";
+                        }
+                        return Appearance.colors.colOnSurfaceVariant;
+                    }
                     font.family: Appearance.fontFamily || "sans-serif"
                     font.pixelSize: 10
                     elide: Text.ElideRight
@@ -142,7 +169,16 @@ Item {
             ColorOverlay {
                 anchors.fill: sIcon
                 source: sIcon
-                color: slider.value > 0.08 ? "#0f1f1a" : Appearance.colors.colOnLayer0
+                color: {
+                    if (slider.value > 0.08) {
+                        if (Appearance.colors && Appearance.colors.colOnPrimary)
+                            return Appearance.colors.colOnPrimary;
+                        var p = Appearance.colors.colPrimary;
+                        var l = (0.299 * p.r + 0.587 * p.g + 0.114 * p.b);
+                        return l > 0.5 ? "#1a120b" : "#ffffff";
+                    }
+                    return Appearance.colors.colOnLayer0;
+                }
                 
                 Behavior on color {
                     ColorAnimation { duration: 200 }
@@ -564,18 +600,85 @@ Item {
                         spacing: 8
                         
                         Repeater {
-                            model: Notifications.popupList
+                            id: notifRepeater
+                            // UPGRADE: Fallback chain checks history list before falling back to short-lived popupList
+                            model: Notifications.notificationList || Notifications.notifications || Notifications.popupList
+                            
                             delegate: Rectangle {
                                 Layout.fillWidth: true
-                                height: 60
+                                implicitHeight: 64
                                 radius: 16
                                 color: Appearance.colors.colLayer1
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.summary
-                                    color: Appearance.colors.colOnLayer0
+                                
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 12
+                                    spacing: 12
+                                    
+                                    Image {
+                                        id: notifIcon
+                                        source: modelData.appIcon || modelData.image || "image://icon/dialog-information"
+                                        Layout.preferredWidth: 32
+                                        Layout.preferredHeight: 32
+                                        fillMode: Image.PreserveAspectFit
+                                        visible: modelData.appIcon || modelData.image
+                                    }
+                                    
+                                    ColumnLayout {
+                                        spacing: 2
+                                        Layout.fillWidth: true
+                                        
+                                        Text {
+                                            text: modelData.summary || ""
+                                            color: Appearance.colors.colOnLayer0
+                                            font.family: Appearance.fontFamily || "sans-serif"
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                        
+                                        Text {
+                                            text: modelData.body || ""
+                                            color: Appearance.colors.colOnSurfaceVariant
+                                            font.family: Appearance.fontFamily || "sans-serif"
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        text: "✕"
+                                        color: Appearance.colors.colOnSurfaceVariant
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (typeof modelData.dismiss === "function") {
+                                                    modelData.dismiss();
+                                                } else if (typeof Notifications.dismissNotification === "function") {
+                                                    Notifications.dismissNotification(modelData.notificationId);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                        }
+                        
+                        Text {
+                            visible: notifRepeater.count === 0
+                            text: "All clear"
+                            color: Appearance.colors.colOnSurfaceVariant
+                            font.family: Appearance.fontFamily || "sans-serif"
+                            font.pixelSize: 12
+                            Layout.alignment: Qt.AlignCenter
+                            Layout.topMargin: 16
+                            Layout.bottomMargin: 16
                         }
                     }
                 }

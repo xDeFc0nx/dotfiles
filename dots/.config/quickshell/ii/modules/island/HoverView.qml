@@ -9,10 +9,8 @@ Item {
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
 
-    
     property var currentDateTime: new Date()
 
-    
     readonly property bool isFullyExpanded: width >= 400
 
     Timer {
@@ -27,9 +25,8 @@ Item {
         id: statusPill
         visible: Battery.available || Network.connected || true
         
-        height: 32
-        width: pillRow.implicitWidth + 24
-        
+        height: 38
+        width: pillRow.implicitWidth + 28
         
         color: {
             if (!Appearance.colors || !Appearance.colors.colLayer0)
@@ -40,7 +37,6 @@ Item {
 
         border.width: 1
 
-        
         border.color: {
             if (!Appearance.colors || !Appearance.colors.colLayer0)
                 return Qt.rgba(255, 255, 255, 0.05);
@@ -48,7 +44,7 @@ Item {
             return isDark ? Qt.rgba(255, 255, 255, 0.06) : Qt.rgba(0, 0, 0, 0.08);
         }
 
-        radius: 16
+        radius: 19
 
         MouseArea {
             id: pillMouseArea
@@ -76,27 +72,33 @@ Item {
             ColorAnimation { property: "border.color"; duration: 200 }
         }
 
-        Row {
+        // RowLayout handles item scaling and alignments correctly without anchor conflicts
+        RowLayout {
             id: pillRow
             anchors.centerIn: parent
             spacing: 8
             layoutDirection: Qt.RightToLeft
 
-            Row {
+            RowLayout {
+                id: batteryRow
                 visible: Battery.available
                 spacing: 3
+                Layout.alignment: Qt.AlignVCenter
+                
                 Text {
                     text: (Battery.percentage !== undefined ? Math.floor(Battery.percentage * 100) : 0) + "%"
                     color: Appearance.colors.colOnLayer0
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                     font.bold: true
-                    anchors.verticalCenter: parent.verticalCenter
+                    height: 20
+                    verticalAlignment: Text.AlignVCenter
+                    Layout.alignment: Qt.AlignVCenter
                 }
 
                 Item {
-                    width: 14
-                    height: 14
-                    anchors.verticalCenter: parent.verticalCenter
+                    width: 20
+                    height: 20
+                    Layout.alignment: Qt.AlignVCenter
 
                     Image {
                         id: batteryImg
@@ -115,9 +117,9 @@ Item {
             }
 
             Item {
-                width: 14
-                height: 14
-                anchors.verticalCenter: parent.verticalCenter
+                width: 20
+                height: 20
+                Layout.alignment: Qt.AlignVCenter
 
                 Image {
                     id: networkImg
@@ -136,20 +138,30 @@ Item {
                 }
             }
 
-            
-            Row {
+            RowLayout {
+                id: weatherRow
                 spacing: 4
+                Layout.alignment: Qt.AlignVCenter
+
                 Text {
                     text: (Weather.data.temp || "--")
                     color: Appearance.colors.colOnLayer0
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                     font.bold: true
-                    anchors.verticalCenter: parent.verticalCenter
+                    height: 20                            // Matches the 20px height of the icon container
+                    verticalAlignment: Text.AlignVCenter  // Centers the glyphs vertically in the 20px box
+                    Layout.alignment: Qt.AlignVCenter
+                    
+                    // Note: If your system font naturally offsets capital/degree letters slightly upwards, 
+                    // you can uncomment the line below to manually tweak the offset:
+                    // topPadding: 1 
                 }
+                
                 Item {
-                    width: 14
-                    height: 14
-                    anchors.verticalCenter: parent.verticalCenter
+                    width: 20
+                    height: 20
+                    Layout.alignment: Qt.AlignVCenter
+                    
                     Image {
                         id: weatherImg
                         source: "../../assets/icons/fluent/weather-sunny-filled.svg"
@@ -168,29 +180,27 @@ Item {
     }
 
     
-    RowLayout {
+    Row {
+        id: prayerInfoRow
         anchors.left: parent.left
         anchors.leftMargin: 24
         anchors.verticalCenter: parent.verticalCenter
-        width: parent.width / 2 - 80 
-        spacing: 8
-        clip: true
+        height: parent.height
+        spacing: 4
 
-        
         opacity: root.isFullyExpanded ? 1.0 : 0.0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 100 } }
 
-        
         Item {
-            Layout.preferredWidth: 16
-            Layout.preferredHeight: 16
-            Layout.alignment: Qt.AlignVCenter
+            width: 22
+            height: 22
+            anchors.verticalCenter: parent.verticalCenter
 
             Image {
                 id: sunPositionImg
                 source: {
-                    var name = PrayerTimes.nextPrayerStr.split(" ")[0]; 
+                    var name = PrayerTimes.nextPrayerData.name; 
                     switch (name) {
                         case "Fajr":
                         case "Dhuhr":
@@ -205,7 +215,7 @@ Item {
                 }
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectFit
-                opacity: 0.0
+                visible: false 
             }
 
             ColorOverlay {
@@ -215,24 +225,22 @@ Item {
             }
         }
 
-        ColumnLayout {
+        Column {
             spacing: 0
-            Layout.fillWidth: true
+            anchors.verticalCenter: parent.verticalCenter
 
             Text {
-                text: PrayerTimes.nextPrayerStr 
+                text: PrayerTimes.nextPrayerData.countdown
                 color: Appearance.colors.colOnLayer0
                 font.family: Appearance.fontFamily || "sans-serif"
-                font.pixelSize: 14
+                font.pixelSize: 18
                 font.bold: true
-                elide: Text.ElideRight
             }
             Text {
-                text: Translation.tr("Next Prayer")
+                text: PrayerTimes.nextPrayerData.name
                 color: Appearance.colors.colOnSurfaceVariant
                 font.family: Appearance.fontFamily || "sans-serif"
-                font.pixelSize: 10
-                elide: Text.ElideRight
+                font.pixelSize: 12
             }
         }
     }
@@ -264,7 +272,6 @@ Item {
         anchors.rightMargin: 24
         anchors.verticalCenter: parent.verticalCenter
 
-        
         opacity: root.isFullyExpanded ? 1.0 : 0.0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 100 } }

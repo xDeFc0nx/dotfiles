@@ -30,7 +30,6 @@ import qs.modules.ii.sessionScreen
 import qs.modules.ii.sidebarLeft
 import qs.modules.ii.sidebarRight
 import qs.modules.ii.overlay
-import qs.modules.ii.wallpaperSelector
 
 Scope {
     id: islandFamily
@@ -68,7 +67,15 @@ Scope {
                 property int launcherWidth: 420
                 property int launcherHeight: launcherViewInstance.implicitHeight + 8
 
+                property int wallpaperWidth: 420
+                property int wallpaperHeight: 360
+
+                property int sessionWidth: 460
+                property int sessionHeight: 108
+
                 property bool launcherOpen: GlobalStates.overviewOpen
+                property bool wallpaperSelectorOpen: GlobalStates.wallpaperSelectorOpen
+                property bool sessionOpen: GlobalStates.sessionOpen
 
                 onLauncherOpenChanged: {
                     isExpanded = false;
@@ -77,12 +84,26 @@ Scope {
                     }
                 }
 
-                focusable: islandWindow.launcherOpen
+                onWallpaperSelectorOpenChanged: {
+                    isExpanded = false;
+                    if (typeof island !== "undefined" && island.hoverDebounceTimer) {
+                        island.hoverDebounceTimer.stop();
+                    }
+                }
+
+                onSessionOpenChanged: {
+                    isExpanded = false;
+                    if (typeof island !== "undefined" && island.hoverDebounceTimer) {
+                        island.hoverDebounceTimer.stop();
+                    }
+                }
+
+                focusable: islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen
                 
                 exclusiveZone: islandWindow.restHeight + 8
                 
                 WlrLayershell.namespace: "quickshell:bar"
-                WlrLayershell.keyboardFocus: islandWindow.launcherOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+                WlrLayershell.keyboardFocus: (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
                 
                 anchors { top: true }
                 
@@ -102,7 +123,6 @@ Scope {
                 property bool isFlashing: false
                 property color flashColor: "#00ffffff"
 
-                
                 property bool showingVolume: false
 
                 Timer {
@@ -132,7 +152,6 @@ Scope {
                     volumeCloseTimer.restart();
                 }
 
-                
                 property real lastVolume: Audio.sink?.audio?.volume ?? 0.0
                 property bool lastMuted: Audio.sink?.audio?.muted ?? false
 
@@ -165,7 +184,6 @@ Scope {
                     }
                 }
 
-                
                 property bool showingBrightness: false
 
                 Timer {
@@ -192,7 +210,6 @@ Scope {
                     brightnessCloseTimer.restart();
                 }
 
-                
                 IpcHandler {
                     target: "brightness"
                     
@@ -204,9 +221,8 @@ Scope {
                         islandWindow.triggerBrightnessChange(-1);
                     }
                 }
-                
 
-                readonly property bool hideElements: isFlashing || showingNotification || showingVolume || showingBrightness
+                readonly property bool hideElements: isFlashing || showingNotification || showingVolume || showingBrightness || wallpaperSelectorOpen || sessionOpen
 
                 onShowingNotificationChanged: console.log("[IslandWindow] state showingNotification changed: " + showingNotification);
                 
@@ -223,7 +239,7 @@ Scope {
                         islandWindow.postNotification(
                             notification.summary,                                         
                             notification.body,                                            
-                            notification.appIcon || notification.image || "image:
+                            notification.appIcon || notification.image || "image://icon/dialog-information",
                             notification.notificationId,
                             notification
                         );
@@ -237,7 +253,7 @@ Scope {
                         islandWindow.postNotification(
                             "Dynamic Island integration", 
                             "System notifications are successfully bound to the custom DBus singleton!", 
-                            "image:
+                            "image://icon/dialog-information",
                             99999,
                             null
                         );
@@ -275,23 +291,23 @@ Scope {
                     PropertyAction { target: flashOverlay; property: "width"; value: 0 }
                     PropertyAction { target: flashOverlay; property: "opacity"; value: 0.85 }
                     ParallelAnimation {
-                        NumberAnimation { target: flashOverlay; property: "width"; to: islandWindow.restWidth; duration: 220; easing.type: Easing.OutQuad }
+                        NumberAnimation { target: flashOverlay; property: "width"; to: islandWindow.restWidth; duration: 150; easing.type: Easing.OutQuad }
                     }
                     ParallelAnimation {
-                        NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.0; duration: 180; easing.type: Easing.InQuad }
-                    }
-                    PropertyAction { target: flashOverlay; property: "width"; value: 0 }
-                    PauseAnimation { duration: 60 }
-
-                    PropertyAction { target: flashOverlay; property: "opacity"; value: 0.85 }
-                    ParallelAnimation {
-                        NumberAnimation { target: flashOverlay; property: "width"; to: islandWindow.restWidth; duration: 220; easing.type: Easing.OutQuad }
-                    }
-                    ParallelAnimation {
-                        NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.0; duration: 180; easing.type: Easing.InQuad }
+                        NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.0; duration: 120; easing.type: Easing.InQuad }
                     }
                     PropertyAction { target: flashOverlay; property: "width"; value: 0 }
                     PauseAnimation { duration: 40 }
+
+                    PropertyAction { target: flashOverlay; property: "opacity"; value: 0.85 }
+                    ParallelAnimation {
+                        NumberAnimation { target: flashOverlay; property: "width"; to: islandWindow.restWidth; duration: 150; easing.type: Easing.OutQuad }
+                    }
+                    ParallelAnimation {
+                        NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.0; duration: 120; easing.type: Easing.InQuad }
+                    }
+                    PropertyAction { target: flashOverlay; property: "width"; value: 0 }
+                    PauseAnimation { duration: 30 }
 
                     onFinished: {
                         islandWindow.isFlashing = false;
@@ -313,7 +329,7 @@ Scope {
 
                 Timer {
                     id: resetStateTimer
-                    interval: 300
+                    interval: 200
                     repeat: false
                     onTriggered: {
                         islandWindow.showingNotification = false;
@@ -321,11 +337,37 @@ Scope {
                     }
                 }
 
-                
-                readonly property int targetWindowWidth: launcherOpen ? (launcherWidth + 24) : ((islandWindow.showingVolume || islandWindow.showingBrightness) ? 324 : (islandWindow.hoverWidth + 64))
-                readonly property int targetWindowHeight: controlCenterOpen ? (ccViewInstance.implicitHeight + 40) : (launcherOpen ? (launcherHeight + 24) : ((islandWindow.showingVolume || islandWindow.showingBrightness) ? 60 : islandWindow.hoverHeight + 24))
+                readonly property int targetWindowWidth: {
+                    if (sessionOpen)
+                        return sessionWidth + 24;
+                    if (wallpaperSelectorOpen)
+                        return wallpaperWidth + 24;
+                    if (launcherOpen)
+                        return launcherWidth + 24;
+                    if (showingVolume || showingBrightness)
+                        return 324;
+                    if (isExpanded)
+                        return hoverWidth + 64;
+                    return restWidth + 24;
+                }
 
-                property int windowWidth: restWidth + 64
+                readonly property int targetWindowHeight: {
+                    if (controlCenterOpen)
+                        return ccViewInstance.implicitHeight + 40;
+                    if (sessionOpen)
+                        return sessionHeight + 24;
+                    if (wallpaperSelectorOpen)
+                        return wallpaperHeight + 24;
+                    if (launcherOpen)
+                        return launcherHeight + 24;
+                    if (showingVolume || showingBrightness)
+                        return 60;
+                    if (isExpanded)
+                        return hoverHeight + 24;
+                    return restHeight + 24;
+                }
+
+                property int windowWidth: restWidth + 24
                 property int windowHeight: restHeight + 24
 
                 onTargetWindowWidthChanged: {
@@ -348,7 +390,7 @@ Scope {
 
                 Timer {
                     id: widthDelayTimer
-                    interval: 110
+                    interval: 70
                     repeat: false
                     onTriggered: {
                         windowWidth = targetWindowWidth;
@@ -357,7 +399,7 @@ Scope {
 
                 Timer {
                     id: heightDelayTimer
-                    interval: 110
+                    interval: 70
                     repeat: false
                     onTriggered: {
                         windowHeight = targetWindowHeight;
@@ -365,7 +407,7 @@ Scope {
                 }
 
                 Component.onCompleted: {
-                    if (islandWindow.launcherOpen) {
+                    if (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen) {
                         GlobalFocusGrab.addDismissable(islandWindow);
                     }
                 }
@@ -376,7 +418,21 @@ Scope {
                 Connections {
                     target: GlobalStates
                     function onOverviewOpenChanged() {
-                        if (!GlobalStates.overviewOpen) {
+                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen) {
+                            GlobalFocusGrab.removeDismissable(islandWindow);
+                        } else {
+                            GlobalFocusGrab.addDismissable(islandWindow);
+                        }
+                    }
+                    function onWallpaperSelectorOpenChanged() {
+                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen) {
+                            GlobalFocusGrab.removeDismissable(islandWindow);
+                        } else {
+                            GlobalFocusGrab.addDismissable(islandWindow);
+                        }
+                    }
+                    function onSessionOpenChanged() {
+                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen) {
                             GlobalFocusGrab.removeDismissable(islandWindow);
                         } else {
                             GlobalFocusGrab.addDismissable(islandWindow);
@@ -388,6 +444,8 @@ Scope {
                     target: GlobalFocusGrab
                     function onDismissed() {
                         GlobalStates.overviewOpen = false;
+                        GlobalStates.wallpaperSelectorOpen = false;
+                        GlobalStates.sessionOpen = false;
                     }
                 }
 
@@ -412,20 +470,25 @@ Scope {
 
                         Rectangle {
                             id: island
+                            
                             color: {
                                 if (!Appearance.colors || !Appearance.colors.colLayer0 || !Appearance.colors.colPrimary)
                                     return "transparent";
                                 var c1 = Appearance.colors.colPrimary;
                                 var c2 = Appearance.colors.colLayer0;
-                                var pct = 0.15;
+                                var pct = 0.35;
                                 return Qt.rgba(
                                     pct * c1.r + (1 - pct) * c2.r,
                                     pct * c1.g + (1 - pct) * c2.g,
                                     pct * c1.b + (1 - pct) * c2.b,
-                                    0.81
+                                    0.92
                                 );
                             }
                             
+                            Behavior on color {
+                                ColorAnimation { duration: 350; easing.type: Easing.InOutQuad }
+                            }
+
                             border.width: islandWindow.islandBorderWidth
                             border.color: {
                                 if (!Appearance.colors || !Appearance.colors.colLayer0 || !Appearance.colors.colOnLayer0)
@@ -443,6 +506,10 @@ Scope {
                             anchors.horizontalCenter: parent.horizontalCenter
                             
                             width: {
+                                if (islandWindow.sessionOpen)
+                                    return islandWindow.sessionWidth;
+                                if (islandWindow.wallpaperSelectorOpen)
+                                    return islandWindow.wallpaperWidth;
                                 if (islandWindow.launcherOpen)
                                     return islandWindow.launcherWidth;
                                 if (islandWindow.showingVolume || islandWindow.showingBrightness)
@@ -452,8 +519,11 @@ Scope {
                                 return islandWindow.hoverWidth;
                             }
                             
-                            
                             height: {
+                                if (islandWindow.sessionOpen)
+                                    return islandWindow.sessionHeight;
+                                if (islandWindow.wallpaperSelectorOpen)
+                                    return islandWindow.wallpaperHeight;
                                 if (islandWindow.launcherOpen)
                                     return islandWindow.launcherHeight;
                                 if (islandWindow.showingVolume || islandWindow.showingBrightness)
@@ -464,17 +534,16 @@ Scope {
                             }
                             
                             radius: {
-                                if (islandWindow.controlCenterOpen || islandWindow.launcherOpen)
+                                if (islandWindow.sessionOpen || islandWindow.wallpaperSelectorOpen || islandWindow.controlCenterOpen || islandWindow.launcherOpen)
                                     return 24;
                                 return Math.min(24, height / 2);
                             }
 
                             readonly property alias hoverDebounceTimer: hoverDebounceTimer
 
-                            
                             HoverHandler {
                                 id: tideTrack
-                                enabled: !islandWindow.launcherOpen
+                                enabled: !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
                                 onHoveredChanged: {
                                     if (hovered) {
                                         hoverDebounceTimer.stop()
@@ -487,19 +556,18 @@ Scope {
 
                             Timer {
                                 id: hoverDebounceTimer
-                                interval: 300
+                                interval: 150 
                                 repeat: false
                                 onTriggered: {
                                     islandWindow.isExpanded = false
                                 }
                             }
 
-                            
                             MouseArea {
                                 anchors.fill: parent
                                 acceptedButtons: Qt.NoButton 
                                 onWheel: (event) => {
-                                    if ((islandWindow.isExpanded || islandWindow.showingVolume) && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen) {
+                                    if ((islandWindow.isExpanded || islandWindow.showingVolume) && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) {
                                         islandWindow.showingBrightness = false;
                                         islandWindow.triggerVolumeChange(event.angleDelta.y);
                                     }
@@ -508,14 +576,14 @@ Scope {
 
                             Behavior on width {
                                 SpringAnimation {
-                                    spring: 7.0      
+                                    spring: 15.0      
                                     damping: 1.0     
                                     epsilon: 0.1
                                 }
                             }
                             Behavior on height {
                                 SpringAnimation {
-                                    spring: 7.0      
+                                    spring: 15.0      
                                     damping: 1.0     
                                     epsilon: 0.1
                                 }
@@ -530,8 +598,8 @@ Scope {
                                     width: islandWindow.restWidth
                                     height: islandWindow.restHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen
-                                    opacity: (islandWindow.isExpanded || islandWindow.launcherOpen || islandWindow.showingVolume || islandWindow.showingBrightness) ? 0.0 : 1.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
+                                    opacity: (islandWindow.isExpanded || islandWindow.launcherOpen || islandWindow.showingVolume || islandWindow.showingBrightness || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen) ? 0.0 : 1.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -543,7 +611,7 @@ Scope {
                                     radius: island.radius
                                     color: islandWindow.flashColor
                                     anchors.centerIn: parent
-                                    visible: islandWindow.isFlashing && !islandWindow.isExpanded && !islandWindow.launcherOpen
+                                    visible: islandWindow.isFlashing && !islandWindow.isExpanded && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
                                 }
 
                                 HoverView {
@@ -551,8 +619,8 @@ Scope {
                                     width: islandWindow.hoverWidth
                                     height: islandWindow.hoverHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen
-                                    opacity: (islandWindow.isExpanded && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness) ? 1.0 : 0.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
+                                    opacity: (islandWindow.isExpanded && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -561,8 +629,8 @@ Scope {
                                     width: islandWindow.hoverWidth
                                     height: islandWindow.hoverHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen
-                                    opacity: (islandWindow.isExpanded && islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness) ? 1.0 : 0.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
+                                    opacity: (islandWindow.isExpanded && islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -570,14 +638,11 @@ Scope {
                                     id: ccViewInstance
                                     islandWindow: islandWindow
                                     width: islandWindow.hoverWidth
-                                    
-                                    
                                     height: implicitHeight 
-                                    
                                     anchors.top: parent.top
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    visible: opacity > 0 && !islandWindow.launcherOpen
-                                    opacity: (islandWindow.isExpanded && islandWindow.controlCenterOpen && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness) ? 1.0 : 0.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
+                                    opacity: (islandWindow.isExpanded && islandWindow.controlCenterOpen && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -590,12 +655,28 @@ Scope {
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
+                                WallpaperView {
+                                    id: wallpaperViewInstance
+                                    anchors.fill: parent
+                                    visible: opacity > 0
+                                    opacity: islandWindow.wallpaperSelectorOpen ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
+                                }
+
+                                PowerMenuView {
+                                    id: powerMenuViewInstance
+                                    anchors.fill: parent
+                                    visible: opacity > 0
+                                    opacity: islandWindow.sessionOpen ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
+                                }
+
                                 VolumeView {
                                     id: volumeViewInstance
                                     anchors.fill: parent
                                     visible: opacity > 0
                                     opacity: islandWindow.showingVolume ? 1.0 : 0.0
-                                    Behavior on opacity { NumberAnimation { duration: 80; easing.type: Easing.InOutQuad } }
+                                    Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
                                 BrightnessView {
@@ -604,7 +685,7 @@ Scope {
                                     screen: islandWindow.screen
                                     visible: opacity > 0
                                     opacity: islandWindow.showingBrightness ? 1.0 : 0.0
-                                    Behavior on opacity { NumberAnimation { duration: 80; easing.type: Easing.InOutQuad } }
+                                    Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
                             }
                         }
@@ -699,6 +780,22 @@ Scope {
         }
     }
 
+    IpcHandler {
+        target: "session"
+
+        function toggle(): void {
+            GlobalStates.sessionOpen = !GlobalStates.sessionOpen;
+        }
+    }
+
+    GlobalShortcut {
+        name: "sessionToggle"
+        description: "Toggle session / power menu"
+        onPressed: {
+            GlobalStates.sessionOpen = !GlobalStates.sessionOpen;
+        }
+    }
+
     PanelLoader { component: Background {} }
     PanelLoader { component: Cheatsheet {} }
     PanelLoader { extraCondition: Config.options.dock.enable; component: Dock {} }
@@ -709,8 +806,12 @@ Scope {
     PanelLoader { component: RegionSelector {} }
     PanelLoader { component: ScreenCorners {} }
     PanelLoader { component: ScreenTranslator {} }
-    PanelLoader { component: SessionScreen {} }
+    
+    PanelLoader { 
+        extraCondition: !GlobalStates.barOpen 
+        component: SessionScreen {} 
+    }
+    
     PanelLoader { component: SidebarLeft {} }
     PanelLoader { component: SidebarRight {} }
-    PanelLoader { component: WallpaperSelector {} }
 }

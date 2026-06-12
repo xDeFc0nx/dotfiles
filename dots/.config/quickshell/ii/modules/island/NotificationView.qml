@@ -70,11 +70,11 @@ Item {
                     anchors.margins: 4
                     source: {
                         var iconStr = root.notificationData ? root.notificationData.icon : "";
-                        if (!iconStr) return "image:
-                        if (iconStr.startsWith("/") || iconStr.startsWith("file:
+                        if (!iconStr) return "image://icon/dialog-information";
+                        if (iconStr.startsWith("/") || iconStr.startsWith("file://")) {
                             return iconStr;
                         }
-                        return "image:
+                        return "image://icon/" + iconStr;
                     }
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true 

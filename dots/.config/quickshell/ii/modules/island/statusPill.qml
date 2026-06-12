@@ -8,13 +8,13 @@ Rectangle {
     id: statusPill
     visible: Battery.available || Network.connected
     
-    height: 32
-    width: Battery.available ? 72 : 40
+    height: 38
+    width: Battery.available ? 82 : 46
     
     color: Appearance.colors.colLayer1
     border.width: 1
     border.color: Appearance.colors.colLayer1 
-    radius: 16
+    radius: 19
 
     MouseArea {
         id: pillMouseArea
@@ -53,14 +53,14 @@ Rectangle {
             Text {
                 text: (Battery.percentage !== undefined ? Math.floor(Battery.percentage * 100) : 0) + "%"
                 color: Appearance.colors.colOnLayer0
-                font.pixelSize: 11
+                font.pixelSize: 13
                 font.bold: true
                 anchors.verticalCenter: parent.verticalCenter
             }
 
             Item {
-                width: 14
-                height: 14
+                width: 20
+                height: 20
                 anchors.verticalCenter: parent.verticalCenter
 
                 Image {
@@ -80,8 +80,8 @@ Rectangle {
         }
 
         Item {
-            width: 14
-            height: 14
+            width: 20
+            height: 20
             anchors.verticalCenter: parent.verticalCenter
 
             Image {
