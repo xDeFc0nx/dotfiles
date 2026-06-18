@@ -192,13 +192,18 @@ Singleton {
             let hasWifi = false;
             let wifiStatus = "disconnected";
             lines.forEach(line => {
-                if (line.includes("ethernet") && (line.includes("connected") || line.includes("unmanaged")))
+                const parts = line.toLowerCase().split(':');
+                if (parts.length < 2) return;
+                const type = parts[0];
+                const state = parts[1];
+
+                if ((type === "ethernet" || type === "wired") && (state.includes("connected") || state.includes("unmanaged")))
                     hasEthernet = true;
-                else if (line.includes("wifi:")) {
-                    if (line.includes("disconnected")) {
+                else if (type === "wifi") {
+                    if (state.includes("disconnected")) {
                         wifiStatus = "disconnected"
                     }
-                    else if (line.includes("connected")) {
+                    else if (state.includes("connected")) {
                         hasWifi = true;
                         wifiStatus = "connected"
 
@@ -207,10 +212,10 @@ Singleton {
                             wifiStatus = "limited"
                         }
                     }
-                    else if (line.includes("connecting")) {
+                    else if (state.includes("connecting")) {
                         wifiStatus = "connecting"
                     }
-                    else if (line.includes("unavailable")) {
+                    else if (state.includes("unavailable")) {
                         wifiStatus = "disabled"
                     }
                 }
