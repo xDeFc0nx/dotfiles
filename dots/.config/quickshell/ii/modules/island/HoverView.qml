@@ -3,11 +3,16 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import qs.modules.common
 import qs.services
+import Quickshell
 
 Item {
     id: root
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
+
+    // Properties passed from IslandFamily.qml to avoid dynamic scope resolution failures
+    property bool isRecordingActive: false
+    property string recordingElapsedText: "00:00"
 
     property var currentDateTime: new Date()
 
@@ -72,7 +77,6 @@ Item {
             ColorAnimation { property: "border.color"; duration: 200 }
         }
 
-        // RowLayout handles item scaling and alignments correctly without anchor conflicts
         RowLayout {
             id: pillRow
             anchors.centerIn: parent
@@ -148,13 +152,9 @@ Item {
                     color: Appearance.colors.colOnLayer0
                     font.pixelSize: 13
                     font.bold: true
-                    height: 20                            // Matches the 20px height of the icon container
-                    verticalAlignment: Text.AlignVCenter  // Centers the glyphs vertically in the 20px box
+                    height: 20                            
+                    verticalAlignment: Text.AlignVCenter  
                     Layout.alignment: Qt.AlignVCenter
-                    
-                    // Note: If your system font naturally offsets capital/degree letters slightly upwards, 
-                    // you can uncomment the line below to manually tweak the offset:
-                    // topPadding: 1 
                 }
                 
                 Item {
@@ -179,7 +179,6 @@ Item {
         }
     }
 
-    
     Row {
         id: prayerInfoRow
         anchors.left: parent.left
@@ -245,28 +244,57 @@ Item {
         }
     }
 
-    
-    ColumnLayout {
+    // Wrapped in a normal Item container so anchors on the MouseArea do not conflict with the layout engine
+    Item {
         anchors.centerIn: parent
-        spacing: 2
+        width: clockLayout.implicitWidth
+        height: clockLayout.implicitHeight
 
-        Text {
-            text: Qt.formatTime(root.currentDateTime, "HH:mm")
-            color: Appearance.colors.colOnLayer0
-            font.family: Appearance.fontFamily || "sans-serif"
-            font.pixelSize: 24
-            font.bold: true
-            Layout.alignment: Qt.AlignCenter
+        ColumnLayout {
+            id: clockLayout
+            anchors.fill: parent
+            spacing: 2
+
+            Text {
+                text: root.isRecordingActive ? root.recordingElapsedText : Qt.formatTime(root.currentDateTime, "HH:mm")
+                color: root.isRecordingActive ? "#ff4f4f" : Appearance.colors.colOnLayer0
+                font.family: Appearance.fontFamily || "sans-serif"
+                font.pixelSize: 24
+                font.bold: true
+                Layout.alignment: Qt.AlignCenter
+
+                Behavior on color {
+                    ColorAnimation { duration: 150 }
+                }
+            }
+            Text {
+                text: root.isRecordingActive ? "REC" : Qt.formatDate(root.currentDateTime, "ddd, MMM d")
+                color: root.isRecordingActive ? "#ff4f4f" : Appearance.colors.colOnSurfaceVariant
+                font.family: Appearance.fontFamily || "sans-serif"
+                font.pixelSize: 12
+                font.bold: root.isRecordingActive
+                Layout.alignment: Qt.AlignCenter
+
+                Behavior on color {
+                    ColorAnimation { duration: 150 }
+                }
+            }
         }
-        Text {
-            text: Qt.formatDate(root.currentDateTime, "ddd, MMM d")
-            color: Appearance.colors.colOnSurfaceVariant
-            font.pixelSize: 12
-            Layout.alignment: Qt.AlignCenter
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: root.isRecordingActive
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                // Iterates natively and terminates active recorders, including OBS (graceful exit saves files safely)
+                const recorders = ["wf-recorder", "wl-screenrec", "gpu-screen-recorder", "obs"];
+                for (var i = 0; i < recorders.length; i++) {
+                    Quickshell.execDetached(["pkill", "-SIGINT", "-x", recorders[i]]);
+                }
+            }
         }
     }
 
-    
     StatusPill {
         anchors.right: parent.right
         anchors.rightMargin: 24
