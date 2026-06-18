@@ -1,0 +1,82 @@
+import QtQuick
+import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
+import qs.services
+import qs.modules.common
+
+Item {
+    id: root
+    width: parent ? parent.width : 0
+    height: parent ? parent.height : 0
+
+    RowLayout {
+        anchors.fill: parent
+        anchors.leftMargin: 16
+        anchors.rightMargin: 16
+        spacing: 12
+
+        // Dynamic Volume Icon based on current state
+        Item {
+            width: 16
+            height: 16
+            Layout.preferredWidth: 16
+            Layout.preferredHeight: 16
+            Layout.alignment: Qt.AlignVCenter
+
+            Image {
+                id: volIcon
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectFit
+                visible: false
+                source: {
+                    if (!Audio.sink?.audio) return "../../assets/icons/fluent/speaker-mute-filled.svg";
+                    if (Audio.sink.audio.muted) return "../../assets/icons/fluent/speaker-mute-filled.svg";
+                    
+                    var vol = Audio.sink.audio.volume;
+                    if (vol <= 0) return "../../assets/icons/fluent/speaker-off.svg";
+                    if (vol < 0.33) return "../../assets/icons/fluent/speaker-0.svg";
+                    if (vol < 0.66) return "../../assets/icons/fluent/speaker-1.svg";
+                    return "../../assets/icons/fluent/speaker-2-filled.svg";
+                }
+            }
+
+            ColorOverlay {
+                anchors.fill: volIcon
+                source: volIcon
+                color: Appearance.colors.colOnLayer0
+            }
+        }
+
+        // Volume Progress Bar
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 6
+            radius: 3
+            color: Qt.rgba(1, 1, 1, 0.12)
+            Layout.alignment: Qt.AlignVCenter
+
+            Rectangle {
+                height: parent.height
+                radius: parent.radius
+                color: Appearance.colors.colPrimary
+                width: parent.width * (Audio.sink?.audio?.muted ? 0 : (Audio.sink?.audio?.volume ?? 0))
+
+                Behavior on width {
+                    NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
+                }
+            }
+        }
+
+        // Volume Percentage Label (e.g., "36%")
+        Text {
+            text: (Audio.sink?.audio?.muted ? "Muted" : Math.round((Audio.sink?.audio?.volume ?? 0) * 100) + "%")
+            color: Appearance.colors.colOnLayer0
+            font.family: Appearance.fontFamily || "sans-serif"
+            font.pixelSize: 12
+            font.bold: true
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredWidth: 32
+            horizontalAlignment: Text.AlignRight
+        }
+    }
+}
