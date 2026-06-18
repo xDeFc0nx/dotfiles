@@ -73,9 +73,50 @@ Scope {
                 property int sessionWidth: 460
                 property int sessionHeight: 108
 
+                property int polkitWidth: 460
+                property int polkitHeight: 180
+
                 property bool launcherOpen: GlobalStates.overviewOpen
                 property bool wallpaperSelectorOpen: GlobalStates.wallpaperSelectorOpen
                 property bool sessionOpen: GlobalStates.sessionOpen
+                property bool polkitOpen: PolkitService.active
+
+                property bool isRecordingActive: false
+                property int recordingElapsedSeconds: 0
+                property string recordingElapsedText: "00:00"
+
+                Timer {
+                    id: recordingTimer
+                    interval: 1000
+                    running: true
+                    repeat: true
+                    onTriggered: {
+                        if (!recordingProcessChecker.running) {
+                            recordingProcessChecker.running = true;
+                        }
+                        if (islandWindow.isRecordingActive) {
+                            islandWindow.recordingElapsedSeconds++
+                            var m = Math.floor(islandWindow.recordingElapsedSeconds / 60)
+                            var s = islandWindow.recordingElapsedSeconds % 60
+                            islandWindow.recordingElapsedText = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s
+                        }
+                    }
+                }
+
+                Process {
+                    id: recordingProcessChecker
+                    command: ["bash", "-c", "pgrep -x wf-recorder || pgrep -x wl-screenrec || pgrep -x gpu-screen-recorder || (PID=$(pgrep -x obs) && ls -l /proc/$PID/fd/ 2>/dev/null | grep -E '\\.(mp4|mkv|flv|mov|ts|webm)$')"]
+                    onExited: (exitCode) => {
+                        var running = (exitCode === 0)
+                        if (running !== islandWindow.isRecordingActive) {
+                            islandWindow.isRecordingActive = running
+                            if (running) {
+                                islandWindow.recordingElapsedSeconds = 0;
+                                islandWindow.recordingElapsedText = "00:00";
+                            }
+                        }
+                    }
+                }
 
                 onLauncherOpenChanged: {
                     isExpanded = false;
@@ -98,12 +139,19 @@ Scope {
                     }
                 }
 
-                focusable: islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen
+                onPolkitOpenChanged: {
+                    isExpanded = false;
+                    if (typeof island !== "undefined" && island.hoverDebounceTimer) {
+                        island.hoverDebounceTimer.stop();
+                    }
+                }
+
+                focusable: islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen
                 
                 exclusiveZone: islandWindow.restHeight + 8
                 
                 WlrLayershell.namespace: "quickshell:bar"
-                WlrLayershell.keyboardFocus: (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+                WlrLayershell.keyboardFocus: (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
                 
                 anchors { top: true }
                 
@@ -154,6 +202,17 @@ Scope {
 
                 property real lastVolume: Audio.sink?.audio?.volume ?? 0.0
                 property bool lastMuted: Audio.sink?.audio?.muted ?? false
+                property bool systemReady: false
+
+                Timer {
+                    id: startupTimer
+                    interval: 1500
+                    running: true
+                    repeat: false
+                    onTriggered: {
+                        islandWindow.systemReady = true;
+                    }
+                }
 
                 Connections {
                     target: Audio.sink?.audio ?? null
@@ -161,8 +220,9 @@ Scope {
                     function onVolumeChanged() {
                         if (Audio.sink?.audio) {
                             var vol = Audio.sink.audio.volume;
-                            if (Math.abs(vol - islandWindow.lastVolume) > 0.005) {
-                                islandWindow.lastVolume = vol;
+                            var oldVol = islandWindow.lastVolume;
+                            islandWindow.lastVolume = vol;
+                            if (islandWindow.systemReady && Math.abs(vol - oldVol) > 0.005) {
                                 if (!islandWindow.controlCenterOpen && !islandWindow.launcherOpen) {
                                     islandWindow.showingBrightness = false;
                                     islandWindow.showingVolume = true;
@@ -174,11 +234,15 @@ Scope {
                     
                     function onMutedChanged() {
                         if (Audio.sink?.audio) {
-                            islandWindow.lastMuted = Audio.sink.audio.muted;
-                            if (!islandWindow.controlCenterOpen && !islandWindow.launcherOpen) {
-                                islandWindow.showingBrightness = false;
-                                islandWindow.showingVolume = true;
-                                volumeCloseTimer.restart();
+                            var muted = Audio.sink.audio.muted;
+                            var oldMuted = islandWindow.lastMuted;
+                            islandWindow.lastMuted = muted;
+                            if (islandWindow.systemReady && muted !== oldMuted) {
+                                if (!islandWindow.controlCenterOpen && !islandWindow.launcherOpen) {
+                                    islandWindow.showingBrightness = false;
+                                    islandWindow.showingVolume = true;
+                                    volumeCloseTimer.restart();
+                                }
                             }
                         }
                     }
@@ -222,7 +286,7 @@ Scope {
                     }
                 }
 
-                readonly property bool hideElements: isFlashing || showingNotification || showingVolume || showingBrightness || wallpaperSelectorOpen || sessionOpen
+                readonly property bool hideElements: isFlashing || showingNotification || showingVolume || showingBrightness || wallpaperSelectorOpen || sessionOpen || polkitOpen
 
                 onShowingNotificationChanged: console.log("[IslandWindow] state showingNotification changed: " + showingNotification);
                 
@@ -338,22 +402,33 @@ Scope {
                 }
 
                 readonly property int targetWindowWidth: {
-                    if (sessionOpen)
-                        return sessionWidth + 24;
-                    if (wallpaperSelectorOpen)
-                        return wallpaperWidth + 24;
-                    if (launcherOpen)
-                        return launcherWidth + 24;
-                    if (showingVolume || showingBrightness)
-                        return 324;
-                    if (isExpanded)
-                        return hoverWidth + 64;
-                    return restWidth + 24;
+                    var baseWidth = 0;
+                    if (polkitOpen)
+                        baseWidth = polkitWidth + 24;
+                    else if (sessionOpen)
+                        baseWidth = sessionWidth + 24;
+                    else if (wallpaperSelectorOpen)
+                        baseWidth = wallpaperWidth + 24;
+                    else if (launcherOpen)
+                        baseWidth = launcherWidth + 24;
+                    else if (showingVolume || showingBrightness)
+                        baseWidth = 324;
+                    else if (isExpanded)
+                        baseWidth = hoverWidth + 64;
+                    else
+                        baseWidth = restWidth + 24;
+
+                    if (isRecordingActive && !isExpanded && !launcherOpen && !wallpaperSelectorOpen && !sessionOpen) {
+                        return baseWidth + 48;
+                    }
+                    return baseWidth;
                 }
 
                 readonly property int targetWindowHeight: {
                     if (controlCenterOpen)
                         return ccViewInstance.implicitHeight + 40;
+                    if (polkitOpen)
+                        return polkitHeight + 24;
                     if (sessionOpen)
                         return sessionHeight + 24;
                     if (wallpaperSelectorOpen)
@@ -407,7 +482,7 @@ Scope {
                 }
 
                 Component.onCompleted: {
-                    if (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen) {
+                    if (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen) {
                         GlobalFocusGrab.addDismissable(islandWindow);
                     }
                 }
@@ -418,21 +493,32 @@ Scope {
                 Connections {
                     target: GlobalStates
                     function onOverviewOpenChanged() {
-                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen) {
+                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen && !PolkitService.active) {
                             GlobalFocusGrab.removeDismissable(islandWindow);
                         } else {
                             GlobalFocusGrab.addDismissable(islandWindow);
                         }
                     }
                     function onWallpaperSelectorOpenChanged() {
-                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen) {
+                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen && !PolkitService.active) {
                             GlobalFocusGrab.removeDismissable(islandWindow);
                         } else {
                             GlobalFocusGrab.addDismissable(islandWindow);
                         }
                     }
                     function onSessionOpenChanged() {
-                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen) {
+                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen && !PolkitService.active) {
+                            GlobalFocusGrab.removeDismissable(islandWindow);
+                        } else {
+                            GlobalFocusGrab.addDismissable(islandWindow);
+                        }
+                    }
+                }
+
+                Connections {
+                    target: PolkitService
+                    function onActiveChanged() {
+                        if (!GlobalStates.overviewOpen && !GlobalStates.wallpaperSelectorOpen && !GlobalStates.sessionOpen && !PolkitService.active) {
                             GlobalFocusGrab.removeDismissable(islandWindow);
                         } else {
                             GlobalFocusGrab.addDismissable(islandWindow);
@@ -446,6 +532,9 @@ Scope {
                         GlobalStates.overviewOpen = false;
                         GlobalStates.wallpaperSelectorOpen = false;
                         GlobalStates.sessionOpen = false;
+                        if (PolkitService.active) {
+                            PolkitService.cancel();
+                        }
                     }
                 }
 
@@ -467,6 +556,64 @@ Scope {
                         width: island.width
                         height: island.height + 8
                         anchors.horizontalCenter: parent.horizontalCenter
+
+                        // Circular Recording Indicator (Separate floating shape on the left)
+                        Rectangle {
+                            id: externalRecordButton
+                            width: 32
+                            height: 32
+                            radius: 16
+                            color: {
+                                if (!Appearance.colors || !Appearance.colors.colLayer0 || !Appearance.colors.colPrimary)
+                                    return "transparent";
+                                var c1 = Appearance.colors.colPrimary;
+                                var c2 = Appearance.colors.colLayer0;
+                                var pct = 0.35;
+                                return Qt.rgba(
+                                    pct * c1.r + (1 - pct) * c2.r,
+                                    pct * c1.g + (1 - pct) * c2.g,
+                                    pct * c1.b + (1 - pct) * c2.b,
+                                    0.92
+                                );
+                            }
+
+                            border.width: islandWindow.islandBorderWidth
+                            border.color: island.border.color
+
+                            anchors.right: island.left
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: island.verticalCenter
+
+                            visible: islandWindow.isRecordingActive && !islandWindow.isExpanded && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
+
+                            Rectangle {
+                                id: redDot
+                                width: 12
+                                height: 12
+                                radius: 6
+                                color: "#ff4f4f"
+                                anchors.centerIn: parent
+
+                                SequentialAnimation on opacity {
+                                    loops: Animation.Infinite
+                                    NumberAnimation { from: 1.0; to: 0.4; duration: 800; easing.type: Easing.InOutQuad }
+                                    NumberAnimation { from: 0.4; to: 1.0; duration: 800; easing.type: Easing.InOutQuad }
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    // Iterates natively and terminates active recorders, including OBS (graceful exit saves files safely)
+                                    const recorders = ["wf-recorder", "wl-screenrec", "gpu-screen-recorder", "obs"];
+                                    for (var i = 0; i < recorders.length; i++) {
+                                        Quickshell.execDetached(["pkill", "-SIGINT", "-x", recorders[i]]);
+                                    }
+                                }
+                            }
+                        }
 
                         Rectangle {
                             id: island
@@ -506,6 +653,8 @@ Scope {
                             anchors.horizontalCenter: parent.horizontalCenter
                             
                             width: {
+                                if (islandWindow.polkitOpen)
+                                    return islandWindow.polkitWidth;
                                 if (islandWindow.sessionOpen)
                                     return islandWindow.sessionWidth;
                                 if (islandWindow.wallpaperSelectorOpen)
@@ -520,6 +669,8 @@ Scope {
                             }
                             
                             height: {
+                                if (islandWindow.polkitOpen)
+                                    return islandWindow.polkitHeight;
                                 if (islandWindow.sessionOpen)
                                     return islandWindow.sessionHeight;
                                 if (islandWindow.wallpaperSelectorOpen)
@@ -534,7 +685,7 @@ Scope {
                             }
                             
                             radius: {
-                                if (islandWindow.sessionOpen || islandWindow.wallpaperSelectorOpen || islandWindow.controlCenterOpen || islandWindow.launcherOpen)
+                                if (islandWindow.polkitOpen || islandWindow.sessionOpen || islandWindow.wallpaperSelectorOpen || islandWindow.controlCenterOpen || islandWindow.launcherOpen)
                                     return 24;
                                 return Math.min(24, height / 2);
                             }
@@ -543,7 +694,7 @@ Scope {
 
                             HoverHandler {
                                 id: tideTrack
-                                enabled: !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
+                                enabled: !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
                                 onHoveredChanged: {
                                     if (hovered) {
                                         hoverDebounceTimer.stop()
@@ -567,7 +718,7 @@ Scope {
                                 anchors.fill: parent
                                 acceptedButtons: Qt.NoButton 
                                 onWheel: (event) => {
-                                    if ((islandWindow.isExpanded || islandWindow.showingVolume) && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) {
+                                    if ((islandWindow.isExpanded || islandWindow.showingVolume) && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) {
                                         islandWindow.showingBrightness = false;
                                         islandWindow.triggerVolumeChange(event.angleDelta.y);
                                     }
@@ -595,11 +746,13 @@ Scope {
 
                                 RestView {
                                     id: restViewInstance
+                                    isRecordingActive: islandWindow.isRecordingActive
+                                    recordingElapsedText: islandWindow.recordingElapsedText
                                     width: islandWindow.restWidth
                                     height: islandWindow.restHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
-                                    opacity: (islandWindow.isExpanded || islandWindow.launcherOpen || islandWindow.showingVolume || islandWindow.showingBrightness || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen) ? 0.0 : 1.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    opacity: (islandWindow.isExpanded || islandWindow.launcherOpen || islandWindow.showingVolume || islandWindow.showingBrightness || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen) ? 0.0 : 1.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -611,16 +764,18 @@ Scope {
                                     radius: island.radius
                                     color: islandWindow.flashColor
                                     anchors.centerIn: parent
-                                    visible: islandWindow.isFlashing && !islandWindow.isExpanded && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
+                                    visible: islandWindow.isFlashing && !islandWindow.isExpanded && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
                                 }
 
                                 HoverView {
                                     id: hoverViewInstance
+                                    isRecordingActive: islandWindow.isRecordingActive
+                                    recordingElapsedText: islandWindow.recordingElapsedText
                                     width: islandWindow.hoverWidth
                                     height: islandWindow.hoverHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
-                                    opacity: (islandWindow.isExpanded && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) ? 1.0 : 0.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    opacity: (islandWindow.isExpanded && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -629,8 +784,8 @@ Scope {
                                     width: islandWindow.hoverWidth
                                     height: islandWindow.hoverHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
-                                    opacity: (islandWindow.isExpanded && islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) ? 1.0 : 0.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    opacity: (islandWindow.isExpanded && islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -641,8 +796,8 @@ Scope {
                                     height: implicitHeight 
                                     anchors.top: parent.top
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen
-                                    opacity: (islandWindow.isExpanded && islandWindow.controlCenterOpen && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen) ? 1.0 : 0.0
+                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    opacity: (islandWindow.isExpanded && islandWindow.controlCenterOpen && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -668,6 +823,14 @@ Scope {
                                     anchors.fill: parent
                                     visible: opacity > 0
                                     opacity: islandWindow.sessionOpen ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
+                                }
+
+                                PolkitView {
+                                    id: polkitViewInstance
+                                    anchors.fill: parent
+                                    visible: opacity > 0
+                                    opacity: islandWindow.polkitOpen ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
