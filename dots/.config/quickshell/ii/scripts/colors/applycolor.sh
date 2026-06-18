@@ -137,12 +137,32 @@ apply_anyterm() {
   done
 }
 
+apply_neovim() {
+  if [ ! -f "$SCRIPT_DIR/terminal/neovim-theme.lua" ]; then
+    echo "Template file not found for Neovim. Skipping that."
+    return
+  fi
+  mkdir -p "$STATE_DIR"/user/generated/terminal
+  cp "$SCRIPT_DIR/terminal/neovim-theme.lua" "$STATE_DIR"/user/generated/terminal/neovim-theme.lua
+  for i in "${!colorlist[@]}"; do
+    local clean_name="${colorlist[$i]#\$}"
+    local camel_name=$(echo "$clean_name" | sed -E 's/_([a-z])/\U\1/g')
+    sed -i "s/${colorlist[$i]} #/${colorvalues[$i]#\#}/g" "$STATE_DIR"/user/generated/terminal/neovim-theme.lua
+    sed -i "s/#${clean_name}#/${colorvalues[$i]}/g" "$STATE_DIR"/user/generated/terminal/neovim-theme.lua
+    sed -i "s/#${camel_name}#/${colorvalues[$i]}/g" "$STATE_DIR"/user/generated/terminal/neovim-theme.lua
+  done
+
+  mkdir -p "$XDG_CONFIG_HOME/nvim/lua"
+  cp "$STATE_DIR"/user/generated/terminal/neovim-theme.lua "$XDG_CONFIG_HOME/nvim/lua/current-theme.lua"
+}
+
 apply_term() {
   apply_anyterm &
   apply_kitty &
   apply_alacritty &
   apply_ghostty &
   apply_starship &
+  apply_neovim &
 }
 
 # Check if terminal theming is enabled in config
