@@ -12,22 +12,22 @@ import qs.modules.common.functions
 Item {
     id: root
     
-    
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
 
-    
+    // Explicitly passed properties to comply with strict bound component behavior
+    property bool isRecordingActive: false
+    property string recordingElapsedText: "00:00"
+
     readonly property HyprlandMonitor monitor: Hyprland.monitorFor(root.QsWindow.window?.screen)
     property int activeWorkspaceId: monitor?.activeWorkspace?.id ?? 1
     property bool showingWorkspace: false
 
-    
     onActiveWorkspaceIdChanged: {
         root.showingWorkspace = true;
         workspaceTimer.restart();
     }
 
-    
     Connections {
         target: ToplevelManager
         function onActiveToplevelChanged() {
@@ -44,17 +44,15 @@ Item {
         onTriggered: showingWorkspace = false
     }
 
-    
     Text {
         id: infoText
         anchors.centerIn: parent
-        text: DateTime.time
-        color: Appearance.colors.colOnLayer0
+        text: root.isRecordingActive ? root.recordingElapsedText : DateTime.time
+        color: root.isRecordingActive ? "#ff4f4f" : Appearance.colors.colOnLayer0
         font.family: Appearance.fontFamily || "sans-serif"
         font.pixelSize: 16
         font.bold: true
 
-        
         anchors.verticalCenterOffset: root.showingWorkspace ? -8 : 0
         Behavior on anchors.verticalCenterOffset {
             NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
@@ -65,7 +63,6 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
     }
 
-    
     Item {
         id: workspacesContainer
         anchors.centerIn: parent
@@ -76,13 +73,11 @@ Item {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
-        
         anchors.verticalCenterOffset: root.showingWorkspace ? 0 : 8
         Behavior on anchors.verticalCenterOffset {
             NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
         }
 
-        
         MouseArea {
             anchors.fill: parent
             onWheel: (event) => {
@@ -102,10 +97,8 @@ Item {
             clip: true         
             model: 10          
             
-            
             currentIndex: Math.max(0, root.activeWorkspaceId - 1)
 
-            
             preferredHighlightBegin: width / 2 - 16
             preferredHighlightEnd: width / 2 + 16
             highlightRangeMode: ListView.StrictlyEnforceRange
@@ -126,7 +119,6 @@ Item {
                     return false;
                 }
 
-                
                 MouseArea {
                     anchors.fill: parent
                     onClicked: {
@@ -141,13 +133,11 @@ Item {
                     font.pixelSize: 12
                     font.bold: isActive
 
-                    
                     scale: isActive ? 1.25 : 1.0
                     Behavior on scale {
                         NumberAnimation { duration: 200; easing.type: Easing.OutBack }
                     }
 
-                    
                     Behavior on color { ColorAnimation { duration: 200 } }
 
                     color: {
