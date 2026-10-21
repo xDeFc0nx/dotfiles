@@ -126,6 +126,7 @@ Item {
                     readonly property string filePathStr: (typeof modelData !== "undefined" && modelData.filePath) ? modelData.filePath : (filePath ? filePath : "")
                     readonly property string fileNameStr: (typeof modelData !== "undefined" && modelData.fileName) ? modelData.fileName : (fileName ? fileName : "")
                     readonly property bool isDirectory: (typeof modelData !== "undefined" && modelData.fileIsDir !== undefined) ? modelData.fileIsDir : (fileIsDir ? fileIsDir : false)
+                    readonly property bool isVideo: !isDirectory && Wallpapers.isVideo(filePathStr)
                     readonly property bool isActive: filePathStr === Config.options.background.wallpaperPath
 
                     Rectangle {
@@ -163,11 +164,11 @@ Item {
                             }
                         }
 
-                        // Wallpaper Thumbnail Representation
+                        // Static wallpaper representation
                         Image {
                             anchors.fill: parent
-                            visible: !isDirectory
-                            source: filePathStr ? "file://" + filePathStr : ""
+                            visible: !isDirectory && !delegateRoot.isVideo
+                            source: (filePathStr && !delegateRoot.isVideo) ? "file://" + filePathStr : ""
                             fillMode: Image.PreserveAspectCrop
                             
                             asynchronous: true
@@ -178,6 +179,32 @@ Item {
 
                             opacity: status === Image.Ready ? 1.0 : 0.0
                             Behavior on opacity { NumberAnimation { duration: 150 } }
+                        }
+
+                        // Live wallpaper (video) preview
+                        VideoThumbnail {
+                            anchors.fill: parent
+                            visible: delegateRoot.isVideo
+                            sourcePath: delegateRoot.isVideo ? filePathStr : ""
+                        }
+
+                        // Play badge for live wallpapers
+                        Rectangle {
+                            visible: delegateRoot.isVideo
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 6
+                            width: 20
+                            height: 20
+                            radius: 10
+                            color: Qt.rgba(0, 0, 0, 0.55)
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "▶"
+                                color: "white"
+                                font.pixelSize: 9
+                            }
                         }
 
                         Rectangle {

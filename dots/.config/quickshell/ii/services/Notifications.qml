@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 
 import qs.modules.common
 import qs
+import qs.services
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -180,6 +181,15 @@ Singleton {
                 root.unread++;
             }
             root.notify(newNotifObject);
+
+            // Play notification sound (respect Do Not Disturb and user setting)
+            if (!root.silent && Config?.options?.sounds?.notification) {
+                try {
+                    Audio.playSystemSound("message-new-instant");
+                } catch (e) {
+                    // Guard against missing Audio or config
+                }
+            }
             // console.log(notifToString(newNotifObject));
             notifFileView.setText(stringifyList(root.list));
         }

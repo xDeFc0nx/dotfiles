@@ -30,6 +30,7 @@ import qs.modules.ii.sessionScreen
 import qs.modules.ii.sidebarLeft
 import qs.modules.ii.sidebarRight
 import qs.modules.ii.overlay
+import "../modules/island/controlcenter/AppColorHelper.js" as AppColorHelper
 
 Scope {
     id: islandFamily
@@ -170,6 +171,7 @@ Scope {
 
                 property bool isFlashing: false
                 property color flashColor: "#00ffffff"
+                readonly property color notificationAccentColor: (activeNotification && activeNotification.appName && activeNotification.appName.length > 0) ? Qt.rgba(AppColorHelper.colorForApp(activeNotification.appName), 0.15) : "transparent"
 
                 property bool showingVolume: false
 
@@ -305,6 +307,7 @@ Scope {
                             notification.body,                                            
                             notification.appIcon || notification.image || "image://icon/dialog-information",
                             notification.notificationId,
+                            notification.appName || notification.desktopEntry || "",
                             notification
                         );
                     }
@@ -324,7 +327,7 @@ Scope {
                     }
                 }
 
-                function postNotification(title, body, icon, id, notification) {
+                function postNotification(title, body, icon, id, appName, notification) {
                     notificationCloseTimer.stop();
                     resetStateTimer.stop();
                     flashAnim.stop();
@@ -333,15 +336,19 @@ Scope {
                         title: title,
                         body: body,
                         icon: icon,
-                        id: id
+                        id: id,
+                        appName: appName
                     };
 
-                    if (notification && typeof Colors !== "undefined" && typeof Colors.getIconColor === "function") {
-                        islandWindow.flashColor = Colors.getIconColor(notification.appIcon || notification.image || "");
+                    var darkmode = Appearance.m3colors && Appearance.m3colors.darkmode;
+                    if (appName && appName.length > 0) {
+                        islandWindow.flashColor = Qt.rgba(AppColorHelper.colorForApp(appName), 0.25);
+                    } else if (notification && typeof Colors !== "undefined" && typeof Colors.getIconColor === "function") {
+                        islandWindow.flashColor = Qt.rgba(Colors.getIconColor(notification.appIcon || notification.image || ""), 0.25);
                     } else if (Appearance.colors && Appearance.colors.colPrimary) {
-                        islandWindow.flashColor = Appearance.colors.colPrimary;
+                        islandWindow.flashColor = Qt.rgba(Appearance.colors.colPrimary, 0.25);
                     } else {
-                        islandWindow.flashColor = "#ffffff";
+                        islandWindow.flashColor = "#33ffffff";
                     }
 
                     islandWindow.isExpanded = false;
@@ -624,12 +631,22 @@ Scope {
                                 var c1 = Appearance.colors.colPrimary;
                                 var c2 = Appearance.colors.colLayer0;
                                 var pct = 0.35;
-                                return Qt.rgba(
+                                var baseColor = Qt.rgba(
                                     pct * c1.r + (1 - pct) * c2.r,
                                     pct * c1.g + (1 - pct) * c2.g,
                                     pct * c1.b + (1 - pct) * c2.b,
                                     0.92
                                 );
+                                // Blend with notification accent color when showing a notification
+                                if (islandWindow.showingNotification && islandWindow.notificationAccentColor !== "transparent") {
+                                    return Qt.rgba(
+                                        0.85 * baseColor.r + 0.15 * Qt.color(islandWindow.notificationAccentColor).r,
+                                        0.85 * baseColor.g + 0.15 * Qt.color(islandWindow.notificationAccentColor).g,
+                                        0.85 * baseColor.b + 0.15 * Qt.color(islandWindow.notificationAccentColor).b,
+                                        0.92
+                                    );
+                                }
+                                return baseColor;
                             }
                             
                             Behavior on color {
@@ -710,7 +727,9 @@ Scope {
                                 interval: 150 
                                 repeat: false
                                 onTriggered: {
-                                    islandWindow.isExpanded = false
+                                    if (!islandWindow.showingNotification) {
+                                        islandWindow.isExpanded = false;
+                                    }
                                 }
                             }
 

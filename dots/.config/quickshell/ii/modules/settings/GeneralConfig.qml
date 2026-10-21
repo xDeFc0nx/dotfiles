@@ -276,6 +276,14 @@ ContentPage {
                 }
             }
             ConfigSwitch {
+                buttonIcon: "notification_sound"
+                text: Translation.tr("Notifications")
+                checked: Config.options.sounds.notification
+                onCheckedChanged: {
+                    Config.options.sounds.notification = checked;
+                }
+            }
+            ConfigSwitch {
                 buttonIcon: "av_timer"
                 text: Translation.tr("Pomodoro")
                 checked: Config.options.sounds.pomodoro

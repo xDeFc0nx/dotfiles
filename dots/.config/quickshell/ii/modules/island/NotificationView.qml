@@ -4,6 +4,7 @@ import Qt5Compat.GraphicalEffects
 import qs
 import qs.services
 import qs.modules.common
+import "controlcenter/AppColorHelper.js" as AppColorHelper
 
 Item {
     id: root
@@ -11,12 +12,18 @@ Item {
     height: parent ? parent.height : 0
 
     property var notificationData: islandWindow.activeNotification
+    readonly property bool darkmode: Appearance.m3colors && Appearance.m3colors.darkmode
+    readonly property string appName: notificationData ? notificationData.appName : ""
+    readonly property color accentColor: appName.length > 0 ? AppColorHelper.accentStripeColor(appName, darkmode) : Appearance.colors.colPrimary
+    readonly property color iconBgColor: appName.length > 0 ? AppColorHelper.iconBackgroundColor(appName, darkmode) : Qt.rgba(255, 255, 255, 0.1)
+    readonly property color appNameTextColor: appName.length > 0 ? AppColorHelper.appNameColor(appName, darkmode) : Appearance.colors.colOnLayer0
+    readonly property color subtleBgTint: appName.length > 0 ? Qt.rgba(AppColorHelper.colorForApp(appName), 0.08) : "transparent"
 
     
     Rectangle {
         id: hoverBackground
         anchors.fill: parent
-        color: clickArea.containsMouse ? Qt.rgba(255, 255, 255, 0.05) : Qt.rgba(255, 255, 255, 0)
+        color: clickArea.containsMouse ? Qt.rgba(255, 255, 255, 0.05) : subtleBgTint
         radius: 12
 
         Behavior on color {
@@ -54,6 +61,16 @@ Item {
         anchors.rightMargin: 24
         spacing: 16
 
+        Rectangle {
+            id: accentStripe
+            width: 3
+            Layout.alignment: Qt.AlignVCenter
+            Layout.fillHeight: true
+            radius: 1.5
+            color: accentColor
+            visible: appName.length > 0
+        }
+
         Item {
             Layout.preferredWidth: 44
             Layout.preferredHeight: 44
@@ -62,7 +79,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: 12
-                color: Qt.rgba(255, 255, 255, 0.1)
+                color: iconBgColor
 
                 Image {
                     id: appIcon
@@ -96,7 +113,7 @@ Item {
 
             Text {
                 text: root.notificationData ? root.notificationData.title : "New Notification"
-                color: Appearance.colors.colOnLayer0
+                color: appNameTextColor
                 font.family: Appearance.fontFamily || "sans-serif"
                 font.pixelSize: 15
                 font.bold: true

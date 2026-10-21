@@ -10,7 +10,8 @@ MouseArea {
     id: root
     required property var fileModelData
     property bool isDirectory: fileModelData.fileIsDir
-    property bool useThumbnail: Images.isValidImageByName(fileModelData.fileName)
+    property bool isVideo: !isDirectory && Wallpapers.isVideo(fileModelData.filePath)
+    property bool useThumbnail: Images.isValidImageByName(fileModelData.fileName) || isVideo
 
     property alias colBackground: background.color
     property alias colText: wallpaperItemName.color
@@ -58,10 +59,15 @@ MouseArea {
                     id: thumbnailImageLoader
                     anchors.fill: parent
                     active: root.useThumbnail
-                    sourceComponent: ThumbnailImage {
+                    sourceComponent: root.isVideo ? videoThumbnailComponent : imageThumbnailComponent
+                }
+
+                Component {
+                    id: imageThumbnailComponent
+                    ThumbnailImage {
                         id: thumbnailImage
                         generateThumbnail: false
-                        sourcePath: fileModelData.filePath
+                        sourcePath: root.fileModelData.filePath
 
                         cache: false
                         fillMode: Image.PreserveAspectCrop
@@ -80,6 +86,40 @@ MouseArea {
                                 if (Qt.resolvedUrl(thumbnailImage.sourcePath) !== Qt.resolvedUrl(filePath)) return;
                                 thumbnailImage.source = "";
                                 thumbnailImage.source = thumbnailImage.thumbnailPath;
+                            }
+                        }
+
+                        layer.enabled: true
+                        layer.effect: OpacityMask {
+                            maskSource: Rectangle {
+                                width: wallpaperItemImageContainer.width
+                                height: wallpaperItemImageContainer.height
+                                radius: Appearance.rounding.small
+                            }
+                        }
+                    }
+                }
+
+                Component {
+                    id: videoThumbnailComponent
+                    VideoThumbnail {
+                        sourcePath: root.fileModelData.filePath
+                        clip: true
+
+                        Rectangle {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 6
+                            width: 20
+                            height: 20
+                            radius: 10
+                            color: Qt.rgba(0, 0, 0, 0.55)
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "▶"
+                                color: "white"
+                                font.pixelSize: 9
                             }
                         }
 
