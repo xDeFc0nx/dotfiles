@@ -1,9 +1,11 @@
 import QtQuick
 import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
+import Quickshell
 import qs
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import "controlcenter/AppColorHelper.js" as AppColorHelper
 
 Item {
@@ -14,10 +16,32 @@ Item {
     property var notificationData: islandWindow.activeNotification
     readonly property bool darkmode: Appearance.m3colors && Appearance.m3colors.darkmode
     readonly property string appName: notificationData ? notificationData.appName : ""
-    readonly property color accentColor: appName.length > 0 ? AppColorHelper.accentStripeColor(appName, darkmode) : Appearance.colors.colPrimary
     readonly property color iconBgColor: appName.length > 0 ? AppColorHelper.iconBackgroundColor(appName, darkmode) : Qt.rgba(255, 255, 255, 0.1)
     readonly property color appNameTextColor: appName.length > 0 ? AppColorHelper.appNameColor(appName, darkmode) : Appearance.colors.colOnLayer0
-    readonly property color subtleBgTint: appName.length > 0 ? Qt.rgba(AppColorHelper.colorForApp(appName), 0.08) : "transparent"
+    readonly property color subtleBgTint: appName.length > 0 ? ColorUtils.applyAlpha(AppColorHelper.colorForApp(appName), 0.08) : "transparent"
+
+    readonly property string genericIconSource: "../../assets/icons/fluent/alert.svg"
+    readonly property string notificationIcon: {
+        const value = root.notificationData ? String(root.notificationData.icon ?? "") : "";
+        if (value.startsWith("image://icon/"))
+            return value.slice("image://icon/".length).split("?")[0];
+        return value;
+    }
+    readonly property string iconSource: {
+        const name = root.notificationIcon;
+        if (name.startsWith("/") || name.startsWith("file://"))
+            return name;
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(name))
+            return name;
+        const themeIcon = name ? Quickshell.iconPath(name, true) : "";
+        if (themeIcon)
+            return themeIcon;
+        const guessedIcon = AppSearch.guessIcon(root.appName || "");
+        const appIcon = (guessedIcon && guessedIcon !== "image-missing") ? Quickshell.iconPath(guessedIcon, true) : "";
+        return appIcon || root.genericIconSource;
+    }
+    readonly property bool tintIcon: root.iconSource === root.genericIconSource
+        || root.notificationIcon.includes("-symbolic") || root.notificationIcon.includes("status/")
 
     
     Rectangle {
@@ -61,16 +85,6 @@ Item {
         anchors.rightMargin: 24
         spacing: 16
 
-        Rectangle {
-            id: accentStripe
-            width: 3
-            Layout.alignment: Qt.AlignVCenter
-            Layout.fillHeight: true
-            radius: 1.5
-            color: accentColor
-            visible: appName.length > 0
-        }
-
         Item {
             Layout.preferredWidth: 44
             Layout.preferredHeight: 44
@@ -85,14 +99,7 @@ Item {
                     id: appIcon
                     anchors.fill: parent
                     anchors.margins: 4
-                    source: {
-                        var iconStr = root.notificationData ? root.notificationData.icon : "";
-                        if (!iconStr) return "image://icon/dialog-information";
-                        if (iconStr.startsWith("/") || iconStr.startsWith("file://")) {
-                            return iconStr;
-                        }
-                        return "image://icon/" + iconStr;
-                    }
+                    source: root.iconSource
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true 
                 }
@@ -101,7 +108,7 @@ Item {
                     anchors.fill: appIcon
                     source: appIcon
                     color: Appearance.colors.colOnLayer0
-                    visible: appIcon.source.toString().includes("-symbolic") || appIcon.source.toString().includes("status/")
+                    visible: root.tintIcon
                 }
             }
         }

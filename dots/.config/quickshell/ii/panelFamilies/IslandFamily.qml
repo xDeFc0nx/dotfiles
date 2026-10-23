@@ -12,6 +12,7 @@ import Qt5Compat.GraphicalEffects
 import qs
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.island
 
@@ -57,7 +58,7 @@ Scope {
                 id: islandWindow
                 screen: islandLoader.modelData
                 
-                exclusionMode: ExclusionMode.Exclusive
+                exclusionMode: ExclusionMode.Normal
                 
                 property int hoverWidth: 490  
                 property int hoverHeight: 86
@@ -171,7 +172,7 @@ Scope {
 
                 property bool isFlashing: false
                 property color flashColor: "#00ffffff"
-                readonly property color notificationAccentColor: (activeNotification && activeNotification.appName && activeNotification.appName.length > 0) ? Qt.rgba(AppColorHelper.colorForApp(activeNotification.appName), 0.15) : "transparent"
+                readonly property color notificationAccentColor: (activeNotification && activeNotification.appName && activeNotification.appName.length > 0) ? ColorUtils.applyAlpha(AppColorHelper.colorForApp(activeNotification.appName), 0.15) : "transparent"
 
                 property bool showingVolume: false
 
@@ -305,7 +306,7 @@ Scope {
                         islandWindow.postNotification(
                             notification.summary,                                         
                             notification.body,                                            
-                            notification.appIcon || notification.image || "image://icon/dialog-information",
+                            notification.appIcon || notification.image || "",
                             notification.notificationId,
                             notification.appName || notification.desktopEntry || "",
                             notification
@@ -320,7 +321,7 @@ Scope {
                         islandWindow.postNotification(
                             "Dynamic Island integration", 
                             "System notifications are successfully bound to the custom DBus singleton!", 
-                            "image://icon/dialog-information",
+                            "",
                             99999,
                             null
                         );
@@ -342,11 +343,11 @@ Scope {
 
                     var darkmode = Appearance.m3colors && Appearance.m3colors.darkmode;
                     if (appName && appName.length > 0) {
-                        islandWindow.flashColor = Qt.rgba(AppColorHelper.colorForApp(appName), 0.25);
+                        islandWindow.flashColor = ColorUtils.applyAlpha(AppColorHelper.colorForApp(appName), 0.25);
                     } else if (notification && typeof Colors !== "undefined" && typeof Colors.getIconColor === "function") {
-                        islandWindow.flashColor = Qt.rgba(Colors.getIconColor(notification.appIcon || notification.image || ""), 0.25);
+                        islandWindow.flashColor = ColorUtils.applyAlpha(Colors.getIconColor(notification.appIcon || notification.image || ""), 0.25);
                     } else if (Appearance.colors && Appearance.colors.colPrimary) {
-                        islandWindow.flashColor = Qt.rgba(Appearance.colors.colPrimary, 0.25);
+                        islandWindow.flashColor = ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.25);
                     } else {
                         islandWindow.flashColor = "#33ffffff";
                     }

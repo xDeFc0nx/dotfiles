@@ -130,6 +130,16 @@ Rectangle {
         console.log("[NotificationHistoryItem] Could not find or launch app for:", modelData.appName)
     }
 
+    MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.LeftButton) {
+                goToApp()
+            }
+        }
+    }
+
     ColumnLayout {
         id: contentColumn
         anchors.fill: parent
@@ -238,9 +248,9 @@ Rectangle {
                         iconSize: Appearance.font.pixelSize.small
                     }
 
-                    ToolTip.visible: true
-                    ToolTip.text: "View"
-                    ToolTip.delay: 500
+                    StyledToolTip {
+                        text: "View"
+                    }
                 }
 
                 RippleButton {
@@ -260,20 +270,10 @@ Rectangle {
                         iconSize: Appearance.font.pixelSize.small
                     }
 
-                    ToolTip.visible: true
-                    ToolTip.text: "Clear"
-                    ToolTip.delay: 500
+                    StyledToolTip {
+                        text: "Clear"
+                    }
                 }
-            }
-        }
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        cursorShape: Qt.PointingHandCursor
-        onClicked: (mouse) => {
-            if (mouse.button === Qt.LeftButton) {
-                goToApp()
             }
         }
     }

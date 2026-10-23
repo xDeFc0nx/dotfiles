@@ -37,7 +37,7 @@ import qs.modules.ii.wallpaperSelector
 PanelWindow {
     id: islandWindow
     required property ShellScreen screen
-    exclusionMode: ExclusionMode.Exclusive
+    exclusionMode: ExclusionMode.Normal
     
     property int hoverWidth: 490  
     property int hoverHeight: 86
