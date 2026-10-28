@@ -11,6 +11,7 @@ Item {
     height: parent ? parent.height : 0
 
     // Properties passed from IslandFamily.qml to avoid dynamic scope resolution failures
+    property var islandWindow: null
     property bool isRecordingActive: false
     property string recordingElapsedText: "00:00"
 
@@ -283,13 +284,18 @@ Item {
 
         MouseArea {
             anchors.fill: parent
-            enabled: root.isRecordingActive
+            enabled: true
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-                // Iterates natively and terminates active recorders, including OBS (graceful exit saves files safely)
-                const recorders = ["wf-recorder", "wl-screenrec", "gpu-screen-recorder", "obs"];
-                for (var i = 0; i < recorders.length; i++) {
-                    Quickshell.execDetached(["pkill", "-SIGINT", "-x", recorders[i]]);
+                if (root.isRecordingActive) {
+                    // Iterates natively and terminates active recorders, including OBS (graceful exit saves files safely)
+                    const recorders = ["wf-recorder", "wl-screenrec", "gpu-screen-recorder", "obs"];
+                    for (var i = 0; i < recorders.length; i++) {
+                        Quickshell.execDetached(["pkill", "-SIGINT", "-x", recorders[i]]);
+                    }
+                } else if (root.islandWindow) {
+                    root.islandWindow.calendarOpen = !root.islandWindow.calendarOpen;
                 }
             }
         }

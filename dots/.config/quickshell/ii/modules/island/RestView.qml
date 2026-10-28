@@ -16,6 +16,7 @@ Item {
     height: parent ? parent.height : 0
 
     // Explicitly passed properties to comply with strict bound component behavior
+    property var islandWindow: null
     property bool isRecordingActive: false
     property string recordingElapsedText: "00:00"
 
@@ -61,6 +62,14 @@ Item {
         opacity: root.showingWorkspace ? 0 : 1
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.LeftButton
+        onTapped: {
+            if (root.islandWindow)
+                root.islandWindow.calendarOpen = !root.islandWindow.calendarOpen;
+        }
     }
 
     Item {

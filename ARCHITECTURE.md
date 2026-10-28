@@ -302,6 +302,8 @@ qs -p ~/.config/quickshell/ii/settings.qml
 
 24. One feature per PR; new features must be config-gated and default off; don't change defaults unasked. No CI will catch a broken QML file.
 
+**Notification rendering: mirror `ii`, never hand-roll it.** The shared stack is `modules/ii/notificationPopup/NotificationPopup.qml` → `NotificationListView` → `NotificationGroup` → `NotificationItem` (single notification gets `onlyNotification: true`, `NotificationGroup.qml:248`). Icons always go through `NotificationAppIcon` (`modules/common/widgets/NotificationAppIcon.qml`), a `MaterialShape` that owns the whole fallback chain — material symbol when no icon, `IconImage` + `Quickshell.iconPath(appIcon, "image-missing")` when an app icon name exists, `StyledImage` when the notification carries an image. Callers pass `appIcon` / `image` / `summary` / `urgency` straight through (`NotificationItem.qml:97-110`, `controlcenter/NotificationHistoryItem.qml:163-171`); Waffle's `WNotificationAppIcon` does the same with `source: icon || fallback`. Body text goes through `NotificationUtils.processNotificationBody(body, appName || summary)` with newlines mapped to `<br/>`, and styling uses `Appearance` / `ColorUtils` tokens, not literals. The island toast was the one surface that guessed icon paths itself (bare `Image` + `Quickshell.iconPath` + `ColorOverlay`), which is exactly how it ended up rendering the theme's magenta `image-missing` icon. Any new notification UI reuses these components rather than re-deriving them.
+
 ## 10. Project Identification
 
 | Field | Value |

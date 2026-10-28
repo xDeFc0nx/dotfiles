@@ -43,14 +43,28 @@ Singleton {
         }
     }
 
+    // image://qsimage/<handle>/<serial> is Quickshell's handle-based image provider: the
+    // handle is only valid for the shell process that created it, so a notification that
+    // carried inline image data cannot be replayed after a reload — the provider answers
+    // "unknown handle" and the icon renders empty. Only the path/name based provider URL
+    // (image://icon/...) is meaningful across runs.
+    readonly property string durableImageProvider: "image://icon/"
+
+    function sanitizeImageUrl(value) {
+        const url = value ? String(value) : "";
+        if (!url.startsWith("image://"))
+            return url;
+        return url.startsWith(root.durableImageProvider) ? url : "";
+    }
+
     function notifToJSON(notif) {
         return {
             "notificationId": notif.notificationId,
             "actions": notif.actions,
-            "appIcon": notif.appIcon,
+            "appIcon": sanitizeImageUrl(notif.appIcon),
             "appName": notif.appName,
             "body": notif.body,
-            "image": notif.image,
+            "image": sanitizeImageUrl(notif.image),
             "summary": notif.summary,
             "time": notif.time,
             "urgency": notif.urgency,
@@ -66,10 +80,12 @@ Singleton {
         running: true
         onTriggered: () => {
             const index = root.list.findIndex((notif) => notif.notificationId === notificationId);
-            const notifObject = root.list[index];
-            print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject?.isTransient);
-            if (notifObject.isTransient) root.discardNotification(notificationId);
-            else root.timeoutNotification(notificationId);
+            const notifObject = index >= 0 ? root.list[index] : null;
+            if (notifObject) {
+                print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject.isTransient);
+                if (notifObject.isTransient) root.discardNotification(notificationId);
+                else root.timeoutNotification(notificationId);
+            }
             destroy()
         }
     }
@@ -252,9 +268,13 @@ Singleton {
         console.log("Notification server index: " + notifServerIndex);
         if (notifServerIndex !== -1) {
             const notifServerNotif = notifServer.trackedNotifications.values[notifServerIndex];
-            const action = notifServerNotif.actions.find((action) => action.identifier === notifIdentifier);
-            // console.log("Action found: " + JSON.stringify(action));
-            action.invoke()
+            const actions = notifServerNotif.actions;
+            const action = actions.find((a) => a.identifier === notifIdentifier)
+                ?? actions.find((a) => a.identifier === "default")
+                ?? actions.find((a) => ["open", "view", "reply"].includes(a.identifier))
+                ?? actions[0];
+            if (action) action.invoke();
+            else console.log("Notification has no invokable action: " + id)
         } 
         else {
             console.log("Notification not found in server: " + id)
@@ -283,10 +303,10 @@ Singleton {
                 return notifComponent.createObject(root, {
                     "notificationId": notif.notificationId,
                     "actions": [], // Notification actions are meaningless if they're not tracked by the server or the sender is dead
-                    "appIcon": notif.appIcon,
+                    "appIcon": root.sanitizeImageUrl(notif.appIcon),
                     "appName": notif.appName,
                     "body": notif.body,
-                    "image": notif.image,
+                    "image": root.sanitizeImageUrl(notif.image),
                     "summary": notif.summary,
                     "time": notif.time,
                     "urgency": notif.urgency,

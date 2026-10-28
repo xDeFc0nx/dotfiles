@@ -36,10 +36,6 @@ import "../modules/island/controlcenter/AppColorHelper.js" as AppColorHelper
 Scope {
     id: islandFamily
 
-    Component.onCompleted: {
-        var initAudio = AudioReminders;
-    }
-
     Variants {
         model: {
             const screens = Quickshell.screens;
@@ -77,6 +73,9 @@ Scope {
 
                 property int polkitWidth: 460
                 property int polkitHeight: 180
+
+                property int calendarWidth: 340
+                property int calendarHeight: calendarViewInstance.implicitHeight + 16
 
                 property bool launcherOpen: GlobalStates.overviewOpen
                 property bool wallpaperSelectorOpen: GlobalStates.wallpaperSelectorOpen
@@ -148,12 +147,12 @@ Scope {
                     }
                 }
 
-                focusable: islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen
+                focusable: islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen || islandWindow.calendarOpen
                 
                 exclusiveZone: islandWindow.restHeight + 8
                 
                 WlrLayershell.namespace: "quickshell:bar"
-                WlrLayershell.keyboardFocus: (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+                WlrLayershell.keyboardFocus: (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen || islandWindow.calendarOpen) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
                 
                 anchors { top: true }
                 
@@ -165,6 +164,7 @@ Scope {
 
                 property bool isExpanded: false
                 property bool controlCenterOpen: false
+                property bool calendarOpen: false
 
                 property bool showingNotification: false
                 property var activeNotification: null
@@ -289,7 +289,7 @@ Scope {
                     }
                 }
 
-                readonly property bool hideElements: isFlashing || showingNotification || showingVolume || showingBrightness || wallpaperSelectorOpen || sessionOpen || polkitOpen
+                readonly property bool hideElements: isFlashing || showingNotification || showingVolume || showingBrightness || wallpaperSelectorOpen || sessionOpen || polkitOpen || calendarOpen
 
                 onShowingNotificationChanged: console.log("[IslandWindow] state showingNotification changed: " + showingNotification);
                 
@@ -297,6 +297,7 @@ Scope {
                     console.log("[IslandWindow] state isExpanded changed: " + isExpanded);
                     if (!isExpanded) {
                         controlCenterOpen = false;
+                        calendarOpen = false;
                     }
                 }
 
@@ -411,7 +412,9 @@ Scope {
 
                 readonly property int targetWindowWidth: {
                     var baseWidth = 0;
-                    if (polkitOpen)
+                    if (calendarOpen)
+                        baseWidth = calendarWidth + 24;
+                    else if (polkitOpen)
                         baseWidth = polkitWidth + 24;
                     else if (sessionOpen)
                         baseWidth = sessionWidth + 24;
@@ -433,6 +436,8 @@ Scope {
                 }
 
                 readonly property int targetWindowHeight: {
+                    if (calendarOpen)
+                        return calendarHeight + 24;
                     if (controlCenterOpen)
                         return ccViewInstance.implicitHeight + 40;
                     if (polkitOpen)
@@ -490,12 +495,20 @@ Scope {
                 }
 
                 Component.onCompleted: {
-                    if (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen) {
+                    if (islandWindow.launcherOpen || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen || islandWindow.calendarOpen) {
                         GlobalFocusGrab.addDismissable(islandWindow);
                     }
                 }
                 Component.onDestruction: {
                     GlobalFocusGrab.removeDismissable(islandWindow);
+                }
+
+                onCalendarOpenChanged: {
+                    if (calendarOpen) {
+                        GlobalFocusGrab.addDismissable(islandWindow);
+                    } else if (!launcherOpen && !wallpaperSelectorOpen && !sessionOpen && !polkitOpen) {
+                        GlobalFocusGrab.removeDismissable(islandWindow);
+                    }
                 }
 
                 Connections {
@@ -540,6 +553,7 @@ Scope {
                         GlobalStates.overviewOpen = false;
                         GlobalStates.wallpaperSelectorOpen = false;
                         GlobalStates.sessionOpen = false;
+                        islandWindow.calendarOpen = false;
                         if (PolkitService.active) {
                             PolkitService.cancel();
                         }
@@ -671,6 +685,8 @@ Scope {
                             anchors.horizontalCenter: parent.horizontalCenter
                             
                             width: {
+                                if (islandWindow.calendarOpen)
+                                    return islandWindow.calendarWidth;
                                 if (islandWindow.polkitOpen)
                                     return islandWindow.polkitWidth;
                                 if (islandWindow.sessionOpen)
@@ -687,6 +703,8 @@ Scope {
                             }
                             
                             height: {
+                                if (islandWindow.calendarOpen)
+                                    return islandWindow.calendarHeight;
                                 if (islandWindow.polkitOpen)
                                     return islandWindow.polkitHeight;
                                 if (islandWindow.sessionOpen)
@@ -766,12 +784,13 @@ Scope {
 
                                 RestView {
                                     id: restViewInstance
+                                    islandWindow: islandWindow
                                     isRecordingActive: islandWindow.isRecordingActive
                                     recordingElapsedText: islandWindow.recordingElapsedText
                                     width: islandWindow.restWidth
                                     height: islandWindow.restHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    visible: opacity > 0 && !islandWindow.calendarOpen && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
                                     opacity: (islandWindow.isExpanded || islandWindow.launcherOpen || islandWindow.showingVolume || islandWindow.showingBrightness || islandWindow.wallpaperSelectorOpen || islandWindow.sessionOpen || islandWindow.polkitOpen) ? 0.0 : 1.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
@@ -789,13 +808,14 @@ Scope {
 
                                 HoverView {
                                     id: hoverViewInstance
+                                    islandWindow: islandWindow
                                     isRecordingActive: islandWindow.isRecordingActive
                                     recordingElapsedText: islandWindow.recordingElapsedText
                                     width: islandWindow.hoverWidth
                                     height: islandWindow.hoverHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
-                                    opacity: (islandWindow.isExpanded && !islandWindow.controlCenterOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) ? 1.0 : 0.0
+                                    visible: opacity > 0 && !islandWindow.calendarOpen && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    opacity: (islandWindow.isExpanded && !islandWindow.controlCenterOpen && !islandWindow.calendarOpen && !islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
@@ -804,7 +824,7 @@ Scope {
                                     width: islandWindow.hoverWidth
                                     height: islandWindow.hoverHeight
                                     anchors.centerIn: parent
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    visible: opacity > 0 && !islandWindow.calendarOpen && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
                                     opacity: (islandWindow.isExpanded && islandWindow.showingNotification && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
@@ -816,7 +836,7 @@ Scope {
                                     height: implicitHeight 
                                     anchors.top: parent.top
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    visible: opacity > 0 && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
+                                    visible: opacity > 0 && !islandWindow.calendarOpen && !islandWindow.launcherOpen && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen
                                     opacity: (islandWindow.isExpanded && islandWindow.controlCenterOpen && !islandWindow.launcherOpen && !islandWindow.showingVolume && !islandWindow.showingBrightness && !islandWindow.wallpaperSelectorOpen && !islandWindow.sessionOpen && !islandWindow.polkitOpen) ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
@@ -843,6 +863,15 @@ Scope {
                                     anchors.fill: parent
                                     visible: opacity > 0
                                     opacity: islandWindow.sessionOpen ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
+                                }
+
+                                IslandCalendarView {
+                                    id: calendarViewInstance
+                                    islandWindow: islandWindow
+                                    anchors.fill: parent
+                                    visible: opacity > 0
+                                    opacity: islandWindow.calendarOpen ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 50; easing.type: Easing.InOutQuad } }
                                 }
 
